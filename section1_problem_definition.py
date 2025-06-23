@@ -1,5 +1,8 @@
 from manim import *
 import numpy as np
+from manim_voiceover import VoiceoverScene
+from manim_voiceover.services.recorder import RecorderService
+from manim_voiceover.services.gtts import GTTSService
 
 
 # 2) extend the pre-amble
@@ -120,7 +123,7 @@ class SpeedGauge(Group):
 
 
         
-class ProblemDefinition(Scene):
+class ProblemDefinition(VoiceoverScene):
     def make_title(self) -> Tex:
         title = Tex(r"Adaptive Algebraic Reuse of Reordering in Cholesky Factorizations with Dynamic Sparsity Patterns", font_size=36)
         return title
@@ -213,28 +216,16 @@ class ProblemDefinition(Scene):
         return group
 
     def construct(self):
-        # # Make the title and start it in the center
-        # title = self.make_title()
-        # title.to_edge(UP)
-        # self.add(title)
+        self.set_speech_service(GTTSService())
 
-        # # Show title in center first
-        # self.play(FadeIn(title))
-        
-        # # Transition title to top with reduced font size
-        # self.play(
-        #     title.animate.to_edge(UP).scale(0.6),
-        #     run_time=0.5
-        # )
-        # self.wait(0.5)
-        
+
         # Start with what is important for us
-        explanation = Tex(r"Performing a \textcolor{red}{sequence} of \textcolor{green}{Sparse Cholesky solves} is common!", 
-                          font_size=36, color=BLUE)
-        explanation.to_edge(UP, buff=1)
-        self.play(Write(explanation))
+        with self.voiceover(text="In many applications such as second-order optimization, a sequence of sparse Cholesky solves is performed!") as tracker:
+            explanation = Tex(r"In many applications such as second-order optimization a \textcolor{red}{sequence} of \textcolor{green}{Sparse Cholesky solves} is performed!", 
+                            font_size=36, color=BLUE)
+            explanation.to_edge(UP, buff=1)
+            self.play(Write(explanation), run_time=tracker.duration)
 
-        self.wait(1)
 
         # Using the algorithm block to show an example of a sequence of linear systems
         algorithm_block = self.make_algorithm_block()
@@ -244,13 +235,11 @@ class ProblemDefinition(Scene):
         algorithm_block.next_to(explanation, DOWN, buff=2)
         algorithm_block.to_edge(LEFT)
         self.add(algorithm_block)
-        self.wait(0.5)
 
 
         # Add a surrounding box around the algorithm_block[3]
         box = SurroundingRectangle(algorithm_block[3], color=RED, buff=0.1)
         self.play(Create(box))
-        self.wait(0.5)
         
         # Create the matrix with subtitle (iteration 1)
         matrix_font_size = 32
@@ -300,45 +289,36 @@ class ProblemDefinition(Scene):
         end_iter = 8
         num_iterations = end_iter - start_iter
         
-        for i, iteration in enumerate(range(start_iter, end_iter)):
-            temperoray_final_values = [final_values[0] / num_iterations * (i + 1), final_values[1] / num_iterations * (i + 1)]
+        with self.voiceover(text="However, analysing the sparsity pattern of the matrix is expensive if it changes rapidly!") as tracker:
+            for i, iteration in enumerate(range(start_iter, end_iter)):
+                temperoray_final_values = [final_values[0] / num_iterations * (i + 1), final_values[1] / num_iterations * (i + 1)]
 
-            # Create new matrix with different sparsity
-            new_matrix_group = self.make_matrix_with_subtitle(matrix_font_size, iteration, sparsity=0.1)
-            new_matrix_group.move_to(matrix_group.get_center())
+                # Create new matrix with different sparsity
+                new_matrix_group = self.make_matrix_with_subtitle(matrix_font_size, iteration, sparsity=0.1)
+                new_matrix_group.move_to(matrix_group.get_center())
 
-            # Animate both matrix transformation and gauge deceleration simultaneously
+                # Animate both matrix transformation and gauge deceleration simultaneously
+                self.play(
+                    Transform(matrix_group, new_matrix_group),
+                    chart.animate.change_bar_values(temperoray_final_values),
+                    run_time=0.5
+                )
+
+            
+            #Making the inspector color in bar chart bold and moving
+            inspector_bar = chart.bars[0]
+            inspector_bar.set_color(RED)
+            inspector_bar.set_weight(BOLD)
+            self.play(inspector_bar.animate.shift(UP * 0.1), run_time=0.2)
+            self.play(inspector_bar.animate.shift(DOWN * 0.1), run_time=0.2)
+            # Make the label bold
+            inspector_label = chart.x_axis.labels[0]
+            original_color = inspector_label.color
             self.play(
-                Transform(matrix_group, new_matrix_group),
-                chart.animate.change_bar_values(temperoray_final_values),
-                run_time=0.5
+                inspector_label.animate.set_color(YELLOW).shift(DOWN * 0.1),
+                run_time=0.2
             )
-
-        
-        #Making the inspector color in bar chart bold and moving
-        inspector_bar = chart.bars[0]
-        inspector_bar.set_color(RED)
-        inspector_bar.set_weight(BOLD)
-        self.play(inspector_bar.animate.shift(UP * 0.1), run_time=0.2)
-        self.play(inspector_bar.animate.shift(DOWN * 0.1), run_time=0.2)
-        # Make the label bold
-        inspector_label = chart.x_axis.labels[0]
-        original_color = inspector_label.color
-        self.play(
-            inspector_label.animate.set_color(YELLOW).shift(DOWN * 0.1),
-            run_time=0.2
-        )
-        self.play(
-            inspector_label.animate.set_color(original_color).shift(UP * 0.1),
-            run_time=0.2
-        )
-        
-
-
-        # Start with what is important for us
-        problem_sentence = Tex(r"However, it is not fast when the \textcolor{red}{sparsity pattern changes} rapidely!", 
-                          font_size=36)
-        problem_sentence.next_to(explanation, DOWN, buff=0.2)
-        self.play(Write(problem_sentence))
-        
-        
+            self.play(
+                inspector_label.animate.set_color(original_color).shift(UP * 0.1),
+                run_time=0.2
+            )
