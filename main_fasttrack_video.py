@@ -106,10 +106,7 @@ class FastTrackComplete(VoiceoverScene):
     def section1(self):
         # Start with what is important for us
         with self.voiceover(text="Applications like second-order optimization involve back-to-back sparse Cholesky solves, but fast-changing sparsity makes each analysis extremely expensive!") as tracker:
-            # explanation = Tex(r"Applications like second-order optimization rely on \textcolor{red}{back-to-back} sparse Cholesky solves, but \textcolor{green}{fast-changing sparsity} makes each analysis prohibitively expensive!", 
-            #                 font_size=36, color=BLUE)
-            # explanation.to_edge(UP, buff=1)
-            # self.play(Write(explanation))
+
 
 
             # Using the algorithm block to show an example of a sequence of linear systems
@@ -122,7 +119,7 @@ class FastTrackComplete(VoiceoverScene):
             algorithm_block.to_edge(LEFT)
             self.add(algorithm_block)
             #Brace the algorithm block
-            algorithm_block_brace = BraceLabel(algorithm_block, text="Second-order Optimization", buff=0.1, font_size=22)
+            algorithm_block_brace = BraceLabel(algorithm_block, text=r"\text{Second-order Optimization}", buff=0.1, font_size=22)
             algorithm_block_brace.next_to(algorithm_block, DOWN, buff=0.1)
             self.add(algorithm_block_brace)
             self.play(FadeIn(algorithm_block), FadeIn(algorithm_block_brace))
@@ -136,7 +133,7 @@ class FastTrackComplete(VoiceoverScene):
             matrix_group = self.make_matrix_with_subtitle(matrix_font_size, 1, sparsity=0.1)
             matrix_group.next_to(algorithm_block, RIGHT, buff=0.5)
             # self.add(matrix_group)
-            matrix_group_brace = BraceLabel(matrix_group, text="Sparse Cholesky Solve", buff=0.1, font_size=22)
+            matrix_group_brace = BraceLabel(matrix_group, text=r"\text{Sparse Cholesky Solve}", buff=0.1, font_size=22)
             matrix_group_brace.next_to(matrix_group, DOWN, buff=0.1)
             # self.add(matrix_group_brace)
             # matrix_group.move_to(ORIGIN)
@@ -150,19 +147,15 @@ class FastTrackComplete(VoiceoverScene):
             )
             # First draw the arrow
             self.play(Create(arrow), run_time=0.01)
-            
-            # Show the matrix
-            self.play(FadeIn(matrix_group), FadeIn(matrix_group_brace), run_time=0.5)
+        
             
             init_values = [0, 0]
             final_values = [84, 16]
             symbolic_val = DecimalNumber(0, num_decimal_places=0)
             numeric_val = DecimalNumber(0, num_decimal_places=0)
-            self.add(symbolic_val, numeric_val)
 
             symbolic_percent = Tex("\%", font_size=22)
             numeric_percent = Tex("\%", font_size=22)
-            self.add(symbolic_percent, numeric_percent)
             # Create the bar chart that shows the inspector bottleneck
             chart = BarChart(
                 values=init_values,
@@ -174,7 +167,9 @@ class FastTrackComplete(VoiceoverScene):
                 y_axis_config={"font_size": 22, "decimal_number_config": {"unit": "\\%", "num_decimal_places": 0}}
             )
             chart.next_to(matrix_group, RIGHT, buff=0.5)
-            self.add(chart)
+                        # Show the matrix
+            self.play(FadeIn(matrix_group), FadeIn(matrix_group_brace),
+                       FadeIn(chart), FadeIn(symbolic_percent), FadeIn(numeric_percent), run_time=0.5)
 
             # # Manually rotate the x-axis labels by 45 degrees
             # for label in chart.x_axis.labels:
@@ -201,7 +196,7 @@ class FastTrackComplete(VoiceoverScene):
             chart.add_updater(chart_updater, call_updater=True)
             symbolic_percent.add_updater(update_percent_symbols, call_updater=True)
             numeric_percent.add_updater(update_percent_symbols, call_updater=True)
-            chart_brace = BraceLabel(chart, text="Sparsity Analysis Overhead", buff=0.1, font_size=22)
+            chart_brace = BraceLabel(chart, text=r"\text{Sparsity Analysis Overhead}", buff=0.1, font_size=22)
             self.add(chart_brace)
 
 
@@ -374,7 +369,7 @@ class FastTrackComplete(VoiceoverScene):
             code_block = self._parth_3_lines_integration()
             code_block.to_edge(UP)
             code_block.to_edge(LEFT)
-            self.play(FadeIn(code_block))
+            self.play(FadeIn(code_block, run_time=tracker.duration))
 
 
         #Arrow from code_block to the next block
@@ -511,7 +506,8 @@ class FastTrackComplete(VoiceoverScene):
     def construct(self):
         # set your TTS engine once
         # self.set_speech_service(GTTSService(speed=1.5))
-        self.set_speech_service(GTTSService(slow=True))
+        # self.set_speech_service(GTTSService(slow=True))
+        self.set_speech_service(RecorderService())
         # — Section 1 —
         self.section1()
         #Clear the scene
@@ -529,4 +525,5 @@ class FastTrackComplete(VoiceoverScene):
         self.section3()
         if self.mobjects:
             self.play(FadeOut(*self.mobjects), run_time=0.3)
-            self.wait(0.1)
+        
+        self.wait(1)
