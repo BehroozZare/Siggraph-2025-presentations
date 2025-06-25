@@ -1,5 +1,7 @@
 from manim import *
-
+from manim_voiceover import VoiceoverScene
+from manim_voiceover.services.recorder import RecorderService
+from manim_voiceover.services.gtts import GTTSService
 
 # 2) extend the pre-amble
 template = TexTemplate()
@@ -13,7 +15,7 @@ config.tex_template = template
 # Configure LaTeX template to include xcolor package
 config.tex_template.add_to_preamble(r"\usepackage{xcolor}")
 
-class ParthContribution(Scene):
+class ParthContribution(VoiceoverScene):
 
     def _parth_3_lines_integration(self) -> Code:
         # Show the three lines of code
@@ -157,11 +159,14 @@ class ParthContribution(Scene):
         pass
 
     def construct(self):
-        code_block = self._parth_3_lines_integration()
-        code_block.to_edge(UP)
-        code_block.to_edge(LEFT)
-        self.play(FadeIn(code_block))
-        self.wait(1)
+        self.set_speech_service(GTTSService())
+
+        with self.voiceover(text="Parth addresses this issue by only three lines of additional code!") as tracker:
+            code_block = self._parth_3_lines_integration()
+            code_block.to_edge(UP)
+            code_block.to_edge(LEFT)
+            self.play(FadeIn(code_block))
+
 
         #Arrow from code_block to the next block
         integration_block = self._parth_intergration_block(font_size=32)
@@ -170,13 +175,14 @@ class ParthContribution(Scene):
         integration_block.to_edge(UP)
         integration_block.to_edge(RIGHT)
 
-        #Create an arrow between the code_block and the integration_block
-        arrow = Arrow(code_block.get_right(), integration_block.get_left(), color=WHITE)
-        self.play(Create(arrow))
+        with self.voiceover(text="By integrating Parth into well-known Cholesky solvers, we enhanced them with a smart memory!") as tracker:
+                #Create an arrow between the code_block and the integration_block
+                arrow = Arrow(code_block.get_right(), integration_block.get_left(), color=WHITE)
+                self.play(Create(arrow))
 
-        self.add(integration_block)
-        self.play(Create(integration_block), run_time=2)
-        self.wait(1)
+                self.add(integration_block)
+                self.play(Create(integration_block), run_time=2)
+
 
 
         reuse_example = self._parth_reuse_example()
@@ -184,13 +190,13 @@ class ParthContribution(Scene):
         reuse_example.next_to(integration_block, DOWN, buff=1.5)
         
 
-        #Arrow from the integration_block to the reuse_example
-        arrow = Arrow(integration_block.get_bottom(), reuse_example.get_top(), color=WHITE)
-        self.play(Create(arrow))
+        with self.voiceover(text="Which allows for reuse of computation!") as tracker:
+            #Arrow from the integration_block to the reuse_example
+            arrow = Arrow(integration_block.get_bottom(), reuse_example.get_top(), color=WHITE)
+            self.play(Create(arrow))
 
-        #Animate the reuse_example photo
-        self.play(FadeIn(reuse_example))
-        self.wait(1)
+            #Animate the reuse_example photo
+            self.play(FadeIn(reuse_example))
 
 
 
@@ -224,16 +230,14 @@ class ParthContribution(Scene):
         # Create an arrow from the reuse_example to the chart
         right_of_chart = chart.get_right()
         right_of_chart[1] = reuse_example.get_left()[1]
-        arrow = Arrow(reuse_example.get_left(), right_of_chart, color=WHITE)
-        self.play(Create(arrow))
+        with self.voiceover(text="Which then result in up to 6x speedup per solve!") as tracker:
+            arrow = Arrow(reuse_example.get_left(), right_of_chart, color=WHITE)
+            self.play(Create(arrow))
 
-        # Animate the chart
-        self.play(
-                chart.animate.change_bar_values(final_values),
-                run_time=0.5
-            )
-
-        self.wait(1)
+            # Animate the chart
+            self.play(
+                    chart.animate.change_bar_values(final_values),
+                    run_time=0.5)
         
 
 
