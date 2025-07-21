@@ -25,6 +25,10 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.mtx
+*.obj
+Presentation/scripts/obj_renders/images/
+Presentation/scripts/matrix_vis/results/
 MANIFEST
 
 # PyInstaller
