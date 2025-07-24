@@ -47,7 +47,7 @@ def create_matrix_tex_pattern(row_num: int, col_num: int, matrix: np.ndarray, te
         row_parts = []
         for j in range(col_num):
             if i == j and row_num == col_num:
-                row_parts.append(f"{i+1}")
+                row_parts.append(f"{i}")
             else:
                 if abs(matrix[i, j]) > 1e-10:  # Non-zero element
                     row_parts.append(r"\ast")
@@ -306,4 +306,368 @@ class SymbolicNumericFramework(VGroup):
         solve_example = VGroup(A_pattern_group, arrow_pattern_to_symbolic, sparse_cholesky_framework, sparse_cholesky_label,
                             numeric_input_group, arrow_solve_input_to_numeric, arrow_sparse_cholesky_to_solve_values, solve_values)
         return solve_example
+    
 
+class CustomBarChart(VGroup):
+    """
+    A BarChart that keeps its numeric labels (“1.2 ×”) and bars in sync.
+
+    Parameters
+    ----------
+    values : list[float]
+        Initial bar heights.
+    bar_names : list[str]
+        Strings shown on the x‑axis.
+    y_range : list[float]
+        [y_min, y_max, step] exactly as in manim.BarChart.
+    y_length, x_length : float
+        Chart dimensions in world‑units.
+    scale_symbol : str, optional
+        String to place after each DecimalNumber (default “×”).
+    x_axis_config, y_axis_config : dict | None
+        Passed straight to BarChart.
+    label_font_size : int, optional
+        Font size of DecimalNumbers and “×”.
+    """
+    def __init__(
+        self,
+        values: list[float],
+        bar_names: list[str],
+        y_range: list[float],
+        y_length: float,
+        x_length: float,
+        *,
+        scale_symbol: str = r"$\times$",
+        x_axis_config: dict | None = None,
+        y_axis_config: dict | None = None,
+        label_font_size: int = 24,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        # --- store arguments -------------------------------------------------
+        self.current_values = list(values)            # local copy we mutate
+        self.scale_symbol = scale_symbol
+        self.label_font_size = label_font_size
+
+        # sensible defaults
+        # x_axis_config = x_axis_config or {"font_size": label_font_size}
+        # y_axis_config = y_axis_config or {"font_size": label_font_size}
+
+        # --------------------------------------------------------------------
+        # 1) the underlying BarChart
+        # --------------------------------------------------------------------
+        self.chart = BarChart(
+            values=values,
+            bar_names=bar_names,
+            y_range=y_range,
+            y_length=y_length,
+            x_length=x_length,
+            x_axis_config={"font_size": label_font_size, "color": BLACK},
+            y_axis_config={"font_size": label_font_size, "color": BLACK},
+        )
+        # rotate x‑axis labels for readability
+        for lbl in self.chart.x_axis.labels:
+            lbl.rotate(PI / 4).shift(DOWN * 0.2 + LEFT * 0.1)
+            lbl.set_color(BLACK)
+        
+        for num in self.chart.y_axis.numbers:
+            num.set_color(BLACK)
+
+        # --------------------------------------------------------------------
+        # 2) the read‑out (“1.2 ×”) for every bar
+        # --------------------------------------------------------------------
+        self.decimals = VGroup()    # DecimalNumber objects
+        self.symbols  = VGroup()    # Tex objects with “×”
+
+        for v in values:
+            d = DecimalNumber(v, num_decimal_places=1, font_size=label_font_size, color=BLACK)
+            s = Tex(self.scale_symbol, font_size=label_font_size, color=BLACK)
+            self.decimals.add(d)
+            self.symbols.add(s)
+
+        # initially position them above their bars
+        self._reposition_labels()
+
+        # --------------------------------------------------------------------
+        # 3) updaters — keep everything glued together each frame
+        # --------------------------------------------------------------------
+        def bar_updater(_):          # _ is the BarChart itself
+            # update bar heights
+            #Get values from decimal numbers
+            values = [d.get_value() for d in self.decimals]
+            self.chart.change_bar_values(values)
+            # and re‑position labels
+            self._reposition_labels()
+
+        self.chart.add_updater(bar_updater)
+
+        # --------------------------------------------------------------------
+        # 4) assemble
+        # --------------------------------------------------------------------
+        self.add(self.chart, self.decimals, self.symbols)
+
+        # --------------------------------------------------------------------
+        # put the thin stuff *on top* of the thick rectangles
+        # --------------------------------------------------------------------
+        self.chart.bars.set_z_index(0)        # draw bars first
+        self.chart.x_axis.set_z_index(1)
+        self.chart.y_axis.set_z_index(1)
+        self.decimals.set_z_index(2)
+        self.symbols.set_z_index(2)
+
+    # ------------------------------------------------------------------------
+    # public helpers
+    # ------------------------------------------------------------------------
+    def set_values_instant(self, new_values: list[float]) -> None:
+        """Change values immediately (no animation)."""
+        self.current_values[:] = new_values
+        for d, v in zip(self.decimals, new_values):
+            d.set_value(v)
+
+    def animate_to_values(self, new_values: list[float], run_time: float = 1):
+        """
+        Return an AnimationGroup that:
+            • animates the DecimalNumbers to *new_values*
+            • (the chart heights follow automatically via the updater)
+        This is convenient so callers only need one play() line.
+        """
+        # keep reference so updater sees the target numbers evolving
+        self.current_values[:] = new_values
+
+        animations = [
+            ChangeDecimalToValue(d, v) for d, v in zip(self.decimals, new_values)
+        ]
+        return AnimationGroup(*animations, run_time=run_time)
+
+    # ------------------------------------------------------------------------
+    # internal helpers
+    # ------------------------------------------------------------------------
+    def _reposition_labels(self) -> None:
+        """Place each decimal and its '×' just above its bar."""
+        for idx, (d, s) in enumerate(zip(self.decimals, self.symbols)):
+            d.next_to(self.chart.bars[idx], UP, buff=0.1)
+            s.next_to(d, RIGHT, buff=0.05)
+
+
+class ParthStepsObject(VGroup):
+    def __init__(
+        self,
+        step_description: list[str],
+        steps_sourrunding_color: str = GREEN_A,
+        step_sorrunding_buff: float = 0.1,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        # ------------------------------------------------------------------ #
+        # Build steps                                                         #
+        # ------------------------------------------------------------------ #
+        self.step_description = step_description
+        self.step_mobjects   = len(step_description)
+        self._visible        = set(range(self.step_mobjects))  # track state
+
+        text_objects = []
+        max_w = max_h = 0
+        for txt in step_description:
+            t = Text(txt, font_size=24, color=BLACK)
+            text_objects.append(t)
+            max_w = max(max_w, t.width)
+            max_h = max(max_h, t.height)
+
+        max_w += step_sorrunding_buff * 2
+        max_h += step_sorrunding_buff * 2
+
+        self.step_objects = VGroup()
+        for t in text_objects:
+            rect = RoundedRectangle(
+                width=max_w, height=max_h,
+                fill_color=GREEN_A, fill_opacity=0.1,
+                stroke_color=steps_sourrunding_color,
+                stroke_width=0.5, corner_radius=0.1,
+            )
+            t.move_to(rect.get_center())
+            self.step_objects.add(VGroup(rect, t))
+
+        self.step_objects.arrange(RIGHT, buff=0.5)
+
+        # outer frame
+        self.parth_box = VGroup()
+
+        self.add(self.parth_box, *self.step_objects)
+
+    # ────────────────────────────────────────────────────────────────────── #
+    # Helpers                                                               #
+    # ────────────────────────────────────────────────────────────────────── #
+    def _get_step_mobjects(self, idx: int) -> VGroup:
+        if not 0 <= idx < self.step_mobjects:
+            raise ValueError(f"Index {idx} out of range.")
+        return self[idx + 1]
+
+    def all_steps(self) -> VGroup:
+        """Return VGroup with *all* steps (handy for Indicate, etc.)."""
+        return self.step_objects
+
+    # ────────────────────────────────────────────────────────────────────── #
+    # Animation‑based show_steps                                            #
+    # ────────────────────────────────────────────────────────────────────── #
+    def show_steps(
+        self,
+        step_numbers: list[int] | None = None,
+        reveal_anim=Create,
+        hide_anim=FadeOut,
+        lag_ratio: float = 0.05,
+        resize_box: bool = True,
+    ) -> AnimationGroup:
+        """
+        Return an AnimationGroup that leaves only *step_numbers* visible.
+
+        Parameters
+        ----------
+        step_numbers  – list of **0‑based** indices to reveal;
+                        ``None`` ⇒ show **all** steps.
+        reveal_anim / hide_anim – animation classes for appearing/disappearing.
+        lag_ratio     – passed to the AnimationGroup for a slight cascade.
+        resize_box    – if True, the outer rectangle shrinks/grows to fit
+                        the *currently* visible steps.
+
+        Usage example
+        -------------
+            parth = ParthStepsObject(["Load", "Clean", "Train", "Eval"])
+            self.play(FadeIn(parth))                 # everything shows
+            self.play(parth.show_steps([1, 2]))      # keep only Clean/Train
+            self.wait()
+            self.play(parth.show_steps([2]))         # now only Train
+        """
+        # ----------------------------- sanity ----------------------------- #
+        if step_numbers is None:
+            new_visible = set()
+        else:
+            if any(not 0 <= i < self.step_mobjects for i in step_numbers):
+                raise ValueError(
+                    f"indices must be in 0..{self.step_mobjects-1}, "
+                    f"got {sorted(step_numbers)}"
+                )
+            new_visible = set(step_numbers)
+
+        old_visible = self._visible
+        if new_visible == old_visible:
+            return AnimationGroup()  # nothing to do
+
+        # ----------------------------- diff ------------------------------- #
+        to_show = new_visible - old_visible
+        to_hide = old_visible - new_visible
+
+        anims = []
+        for idx in to_show:
+            grp = self._get_step_mobjects(idx)
+            grp.set_opacity(1)               # start hidden
+            anims.append(reveal_anim(grp))
+
+        for idx in to_hide:
+            grp = self._get_step_mobjects(idx)
+            grp.set_opacity(0)
+            anims.append(hide_anim(grp))
+
+        # --------------------------- resize box --------------------------- #
+        if resize_box:
+            if new_visible:
+                tgt = SurroundingRectangle(
+                    VGroup(*[self._get_step_mobjects(i) for i in new_visible]),
+                    fill_color=BLUE_A, stroke_color=BLUE_B,
+                    stroke_width=1, corner_radius=0.1, buff=0.1,
+                )
+                anims.insert(0, Transform(self.parth_box, tgt))
+            else:  # no steps → fade the box out
+                anims.insert(0, FadeOut(self.parth_box))
+
+        # record new state
+        self._visible = new_visible
+        return AnimationGroup(*anims, lag_ratio=lag_ratio)
+
+    # ────────────────────────────────────────────────────────────────────── #
+    # Optional animated highlighter                                         #
+    # ────────────────────────────────────────────────────────────────────── #
+    def highlight_step(
+        self,
+        step_number: int,
+        highlight_color: str | ManimColor = YELLOW,
+        run_time: float = 0.5,
+    ) -> AnimationGroup:
+        """
+        Animated tint of a single step’s stroke & text.
+
+        Example
+        -------
+            self.play(parth.highlight_step(2))
+        """
+        grp = self._get_step_mobjects(step_number)
+        rect, txt = grp
+        return AnimationGroup(
+            rect.animate.set_stroke(color=highlight_color, width=2),
+            txt.animate.set_color(highlight_color),
+            lag_ratio=0.0, run_time=run_time,
+        )
+
+
+
+
+class ParthToyExample(VGroup):
+    def __init__(self, matrix: np.ndarray, color_nodes: dict[int, str] = None, font_size: int = 24, **kwargs):
+        super().__init__(**kwargs)
+        n = matrix.shape[0]
+        verts = list(range(n))
+        # only include each undirected edge once
+        edges = [(i, j) for i in range(n) for j in range(i+1, n) if matrix[i, j] != 0]
+
+        default_style = {
+            "stroke_color": BLACK,
+            "stroke_width": 2,
+        }
+        # layout can still be your manual function, NX only supplies the signature
+        def custom_layout(g, scale=1):
+            return {
+                0:(0,0,0), 1:(0,1,0), 2:(1,1,0),
+                3:(1,0,0), 4:(0,-1,0),5:(-1,-1,0),
+                6:(-1,0,0),7:(-1,1,0), 8:(1,-1,0),
+            }
+    
+        vertex_config = {}
+        if color_nodes is not None:
+            for node in verts:
+                if node in color_nodes:
+                    vertex_config[node] = {"fill_color": color_nodes[node], "fill_opacity": 1, "stroke_color": BLACK, "stroke_width": 1}
+                else:
+                    vertex_config[node] = {"fill_color": GREEN_A, "fill_opacity": 1, "stroke_color": BLACK, "stroke_width": 1}
+        else:
+            vertex_config = {"fill_color": GREEN_A, "fill_opacity": 1, "stroke_color": BLACK, "stroke_width": 1}
+
+        self.G = Graph(
+            verts,
+            edges,
+            labels={v: Text(str(v), font_size=font_size, color=BLACK) for v in verts},
+            vertex_config=vertex_config,
+            layout=custom_layout,
+            edge_config=default_style,
+        )
+
+        # Remove the straight line for (2,8)
+        if (2, 8) in self.G.edges:
+            self.G.remove_edges((2, 8))
+
+            # # Optionally, add an updater so it follows the nodes:
+            self.G.add_edges(
+                (2, 8),
+                edge_type=ArcBetweenPoints,
+                edge_config={
+                    "angle": -PI / 2,
+                    "stroke_color": BLACK,
+                    "stroke_width": 2,
+                },
+            )
+
+
+        edges = VGroup(*self.G.edges.values())
+        nodes = VGroup(*self.G.vertices.values())
+        labels = VGroup(*self.G._labels.values())
+        self.add(edges, nodes, labels)

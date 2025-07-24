@@ -367,7 +367,7 @@ class Background():
                 self.scene.play(ReplacementTransform(self.linear_sys_definition, self.dense_eq), run_time=self.transform_runtime)
                 self.scene.wait(self.wait_time)
 
-            script2 = "One accurate method is Cholesky factorization, which decomposes the matrix into lower and upper triangular matrices."
+            script2 = "Here we are focusing on Cholesky factorization, which decomposes the matrix into lower and upper triangular matrices."
             with self.scene.voiceover(text=script2) as tracker:
                 # Scale and move up
                 self.scene.play(self.dense_eq.animate.scale(self.scale_factor).move_to(centers[0]), run_time=self.transform_runtime)
@@ -393,7 +393,7 @@ class Background():
                 self.scene.play(FadeIn(self.dense_forward_backward_block), run_time=self.transform_runtime)
                 self.scene.wait(self.wait_time)
 
-            script4 = "However In applications such as those the Finite Element Method, the system matrix is often symmetric and sparse, with over 95\% of entries being zero."
+            script4 = "For Finite Element Method, the linear system is often symmetric and sparse."
             with self.scene.voiceover(text=script4) as tracker:
                 #Sparse pipeline
                 self.sparse_eq.move_to(self.dense_eq.get_center())
@@ -415,8 +415,7 @@ class Background():
                 self.scene.play(FadeIn(sparse_matrix_label), run_time=self.transform_runtime)
                 self.scene.wait(self.wait_time)
 
-            script5 = "To take advantage of sparsity, sparse matrix formats such as Compressed Row \
-                format are proposed and used that effectively reduce memory footprint of the linear system."
+            script5 = "To take advantage of the sparsity, sparse matrix formats such as Compressed Row format are proposed."
             with self.scene.voiceover(text=script5) as tracker:
                 # Fadeout all the objects beside the linear system
                 sparse_linear_system = self.sparse_eq[0][0]
@@ -450,8 +449,8 @@ class Background():
                 self.scene.play(FadeIn(csr_format_object), run_time=self.transform_runtime)
                 self.scene.play(FadeIn(sparse_brace_label), FadeIn(dense_brace_label), run_time=self.transform_runtime)
 
-            script6 = "However, their irregular structure makes parallelism and vectorization difficult. Here for example, retreving a value from a dense \
-                representation is straightforward, but for a sparse representation, it requires traversing multiple non-zero elements."
+            script6 = "These formats save memory. However, applying parallelism and vectorization become non-trivial.\
+            Here, for example, retrieving an element from a dense layout is straightforward, but in a sparse one, you must scan multiple non-zero entries."
             with self.scene.voiceover(text=script6) as tracker:
                 #Fade out everythings beside the csr_Format_object
                 dense_ret_code = Code(
@@ -490,9 +489,9 @@ class Background():
                 self.scene.play(FadeOut(*self.scene.mobjects), run_time=0.2)
                 self.scene.wait(0.1)
 
-            script7 = "To address this, a two-step approach is used: \
-            First, the sparsity pattern of linear system is analyzed in the phase called symbolic analysis. \
-            Then, using this analysis, the sparse factorization followed by sparse solve is performed in the phase called numeric analysis."
+            script7 = "State-of-the-art sparse solvers use a two-step approach to reduce this limitation.\
+            In symbolic phase, the sparsity pattern is analyzed for applying acceleration techniques. \
+            Then, using this analysis, the numerical phase is performed, where the factorization and forward/backward substitution are performed."
             with self.scene.voiceover(text=script7) as tracker:
                 #Create two objects 
                 A_sp = self._create_paper_sparse_matrix()
@@ -501,10 +500,10 @@ class Background():
                 self.scene.play(Create(symbolic_numeric_framework), run_time=self.transform_runtime)
 
 
-            script8 = "Here as an example, we apply laplace-beltrami operator on this ball.\
-                The operator has around 7 milion non-zeros with more than 99% sparsity.\
-                the symbolic analysis is performed in 1.9 seconds and the numeric analysis is performed in 1 second.\
-                Note that the symbolic analysis runtime is more than executor for a single Cholesky solve."
+            script8 = "Here as an example, we apply laplace-beltrami operator on this mesh.\
+                The resultant matrix has approximately 7 million non-zeros with more than 99% sparsity.\
+                The symbolic analysis is performed in 1.9 seconds and the numeric computation is performed in 1 second.\
+                Note that in here, the symbolic analysis runtime is more than numeric computation for a single Cholesky solve."
             with self.scene.voiceover(text=script8) as tracker:
                 final_example = self._final_example()
                 final_example.center()
