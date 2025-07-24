@@ -478,13 +478,15 @@ class ParthStepsObject(VGroup):
         max_w += step_sorrunding_buff * 2
         max_h += step_sorrunding_buff * 2
 
+        self.default_stroke_color = GREEN_A
+        self.default_stroke_width = 0.5
         self.step_objects = VGroup()
         for t in text_objects:
             rect = RoundedRectangle(
                 width=max_w, height=max_h,
-                fill_color=GREEN_A, fill_opacity=0.1,
+                fill_color=self.default_stroke_color, fill_opacity=0.1,
                 stroke_color=steps_sourrunding_color,
-                stroke_width=0.5, corner_radius=0.1,
+                stroke_width=self.default_stroke_width, corner_radius=0.1,
             )
             t.move_to(rect.get_center())
             self.step_objects.add(VGroup(rect, t))
@@ -494,6 +496,7 @@ class ParthStepsObject(VGroup):
         # outer frame
         self.parth_box = VGroup()
 
+        self.highlight_step_number = None
         self.add(self.parth_box, *self.step_objects)
 
     # ────────────────────────────────────────────────────────────────────── #
@@ -603,71 +606,25 @@ class ParthStepsObject(VGroup):
         """
         grp = self._get_step_mobjects(step_number)
         rect, txt = grp
-        return AnimationGroup(
-            rect.animate.set_stroke(color=highlight_color, width=2),
-            txt.animate.set_color(highlight_color),
-            lag_ratio=0.0, run_time=run_time,
-        )
-
-
-
-
-class ParthToyExample(VGroup):
-    def __init__(self, matrix: np.ndarray, color_nodes: dict[int, str] = None, font_size: int = 24, **kwargs):
-        super().__init__(**kwargs)
-        n = matrix.shape[0]
-        verts = list(range(n))
-        # only include each undirected edge once
-        edges = [(i, j) for i in range(n) for j in range(i+1, n) if matrix[i, j] != 0]
-
-        default_style = {
-            "stroke_color": BLACK,
-            "stroke_width": 2,
-        }
-        # layout can still be your manual function, NX only supplies the signature
-        def custom_layout(g, scale=1):
-            return {
-                0:(0,0,0), 1:(0,1,0), 2:(1,1,0),
-                3:(1,0,0), 4:(0,-1,0),5:(-1,-1,0),
-                6:(-1,0,0),7:(-1,1,0), 8:(1,-1,0),
-            }
-    
-        vertex_config = {}
-        if color_nodes is not None:
-            for node in verts:
-                if node in color_nodes:
-                    vertex_config[node] = {"fill_color": color_nodes[node], "fill_opacity": 1, "stroke_color": BLACK, "stroke_width": 1}
-                else:
-                    vertex_config[node] = {"fill_color": GREEN_A, "fill_opacity": 1, "stroke_color": BLACK, "stroke_width": 1}
+        if self.highlight_step_number is not None:
+            prev_highlighted_step = self.highlight_step_number
+            prev_grp = self._get_step_mobjects(prev_highlighted_step)
+            prev_rect, prev_txt = prev_grp
+            self.highlight_step_number = step_number
+            return AnimationGroup(
+                prev_rect.animate.set_stroke(color=self.default_stroke_color, width=self.default_stroke_width),
+                prev_txt.animate.set_color(BLACK),
+                rect.animate.set_stroke(color=highlight_color, width=2),
+                txt.animate.set_color(highlight_color),
+                lag_ratio=0.0, run_time=run_time,
+            )
         else:
-            vertex_config = {"fill_color": GREEN_A, "fill_opacity": 1, "stroke_color": BLACK, "stroke_width": 1}
-
-        self.G = Graph(
-            verts,
-            edges,
-            labels={v: Text(str(v), font_size=font_size, color=BLACK) for v in verts},
-            vertex_config=vertex_config,
-            layout=custom_layout,
-            edge_config=default_style,
-        )
-
-        # Remove the straight line for (2,8)
-        if (2, 8) in self.G.edges:
-            self.G.remove_edges((2, 8))
-
-            # # Optionally, add an updater so it follows the nodes:
-            self.G.add_edges(
-                (2, 8),
-                edge_type=ArcBetweenPoints,
-                edge_config={
-                    "angle": -PI / 2,
-                    "stroke_color": BLACK,
-                    "stroke_width": 2,
-                },
+            self.highlight_step_number = step_number
+            return AnimationGroup(
+                rect.animate.set_stroke(color=highlight_color, width=2),
+                txt.animate.set_color(highlight_color),
+                lag_ratio=0.0, run_time=run_time,
             )
 
 
-        edges = VGroup(*self.G.edges.values())
-        nodes = VGroup(*self.G.vertices.values())
-        labels = VGroup(*self.G._labels.values())
-        self.add(edges, nodes, labels)
+
