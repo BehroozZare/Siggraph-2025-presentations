@@ -57,10 +57,25 @@ def create_matrix_tex_pattern(row_num: int, col_num: int, matrix: np.ndarray, te
         if i < row_num - 1:
             matrix_str += r" \\ "
     matrix_str += r"\end{array}$"
-    
-    
-    # Create the matrix as LaTeX
-    matrix_pattern = Tex(matrix_str, color=text_color, font_size=font_size)  # Reduced font size for better fit # Scale down for better visibility
+
+def create_manim_Matrix(row_num: int, col_num: int, matrix: np.ndarray) -> Matrix:
+    matrix_str = []
+    for i in range(row_num):
+        row_parts = []
+        for j in range(col_num):
+            if i == j:
+                row_parts.append(f"{i}")
+            else:
+                if matrix[i, j] != 0:
+                    row_parts.append(r"\ast")
+                else:
+                    row_parts.append(r"\ast")
+        matrix_str.append(row_parts)
+    matrix_pattern = Matrix(matrix_str)
+    for i in range(matrix.shape[0]):
+        for j in range(matrix.shape[1]):
+            if matrix[i, j] != 0:
+                matrix_pattern.get_entries()[i * col_num + j].set_color(BLACK)
     return matrix_pattern
 
 def create_matrix_tex_with_values(row_num: int, col_num: int, matrix: np.ndarray, text_color: str = BLACK,
