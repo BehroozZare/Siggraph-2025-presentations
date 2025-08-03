@@ -25,9 +25,9 @@ class FastTrackComplete(VoiceoverScene):
 
     def construct(self):
         # set your TTS engine once
-        self.set_speech_service(GTTSService())
+        # self.set_speech_service(GTTSService())
         self.camera.background_color = WHITE
-        # self.set_speech_service(RecorderService())
+        self.set_speech_service(RecorderService())
         # # — Section 1 —
         # self.section0.play_title()
         # if self.mobjects:

@@ -11,14 +11,96 @@ template.add_to_preamble(r"\usepackage{xcolor}")
 
 config.tex_template = template
 
+# Custom ArcBetweenPoints wrapper for Graph compatibility
+class GraphCompatibleArcBetweenPoints(ArcBetweenPoints):
+    def __init__(self, start, end, angle=-PI/2, radius=None, **kwargs):
+        self.angle = angle
+        self.radius = radius
+        super().__init__(start, end, angle=angle, radius=radius, color=kwargs.get("stroke_color", BLACK), stroke_width=kwargs.get("stroke_width", 2))
+        # Ensure no fill
+        self.set_fill(opacity=0)
+    
+    def set_points_by_ends(self, start, end, buff=0, **kwargs):
+        """Make compatible with Graph class edge updates"""
+        # Apply buff to the start and end points
+        if buff > 0:
+            direction = end - start
+            unit_direction = direction / np.linalg.norm(direction)
+            start = start + buff * unit_direction
+            end = end - buff * unit_direction
+        
+        # Create a new arc and copy its points
+        new_arc = ArcBetweenPoints(start, end, angle=self.angle, radius=self.radius, color=kwargs.get("stroke_color", BLACK), stroke_width=kwargs.get("stroke_width", 2))
+        self.set_points(new_arc.get_points())
+        # Ensure no fill
+        self.set_fill(opacity=0)
+        return self
+
 # Custom DashedArcBetweenPoints class
 class DashedArcBetweenPoints(DashedVMobject):
     def __init__(self, start, end, angle=-PI/2, radius=None, num_dashes=15, dashed_ratio=0.5, **kwargs):
+        # Store parameters for later use
+        self.angle = angle
+        self.radius = radius
+        self.num_dashes = num_dashes
+        self.dashed_ratio = dashed_ratio
+        
+        # Extract and store color-related kwargs for later use
+        self.stored_stroke_color = kwargs.get("stroke_color", BLACK)
+        self.stored_stroke_width = kwargs.get("stroke_width", 2)
+        
         # Create the base arc
-        arc = ArcBetweenPoints(start, end, angle=angle, radius=radius, **kwargs)
+        arc = GraphCompatibleArcBetweenPoints(start, end, angle=angle, radius=radius, **kwargs)
         
         # Initialize DashedVMobject with the arc
-        super().__init__(arc, num_dashes=num_dashes, dashed_ratio=dashed_ratio, **kwargs)
+        super().__init__(arc, num_dashes=num_dashes)
+        
+        # Explicitly set the color and stroke width on the dashed object
+        self.set_color(self.stored_stroke_color)
+        self.set_stroke(color=self.stored_stroke_color, width=self.stored_stroke_width)
+        
+        # Ensure no fill for the entire object and all submobjects
+        self.set_fill(opacity=0)
+        for submob in self.submobjects:
+            submob.set_fill(opacity=0)
+            submob.set_stroke(color=self.stored_stroke_color, width=self.stored_stroke_width)
+    
+    def set_points_by_ends(self, start, end, buff=0, **kwargs):
+        """Make compatible with Graph class edge updates"""
+        # Apply buff to the start and end points
+        if buff > 0:
+            direction = end - start
+            unit_direction = direction / np.linalg.norm(direction)
+            start = start + buff * unit_direction
+            end = end - buff * unit_direction
+        
+        # Update stored colors if new ones are provided in kwargs
+        if "stroke_color" in kwargs:
+            self.stored_stroke_color = kwargs["stroke_color"]
+        if "stroke_width" in kwargs:
+            self.stored_stroke_width = kwargs["stroke_width"]
+        
+        # Create a new arc with updated points, using stored colors
+        arc_kwargs = kwargs.copy()
+        arc_kwargs["stroke_color"] = self.stored_stroke_color
+        arc_kwargs["stroke_width"] = self.stored_stroke_width
+        arc = GraphCompatibleArcBetweenPoints(start, end, angle=self.angle, radius=self.radius, **arc_kwargs)
+        
+        # Update this dashed object with the new arc
+        self.submobjects = []
+        super().__init__(arc, num_dashes=self.num_dashes)
+        
+        # Explicitly set the color and stroke width on the updated dashed object
+        self.set_color(self.stored_stroke_color)
+        self.set_stroke(color=self.stored_stroke_color, width=self.stored_stroke_width)
+        
+        # Ensure no fill for the entire object and all submobjects
+        self.set_fill(opacity=0)
+        for submob in self.submobjects:
+            submob.set_fill(opacity=0)
+            submob.set_stroke(color=self.stored_stroke_color, width=self.stored_stroke_width)
+        
+        return self
 
 # layout can still be your manual function, NX only supplies the signature
 def custom_layout(g, scale=1):
@@ -29,7 +111,7 @@ def custom_layout(g, scale=1):
     }
 
 class ParthToyExample(VGroup): 
-    def __init__(self, matrix: np.ndarray, color_nodes: dict[int, str] = None, font_size: int = 24, **kwargs):
+    def __init__(self, matrix: np.ndarray, color_nodes: dict[int, str] = None, font_size: int = 48, **kwargs):
         super().__init__(**kwargs)
         n = matrix.shape[0]
         self.verts = list(range(n))
@@ -57,15 +139,15 @@ class ParthToyExample(VGroup):
             """Create a pretty random star."""
             # show the block identifier as e.g. 𝔅₀, 𝔅₁, …
             label_text = MathTex(r"{%d}" % label, font_size=font_size, color=BLACK)
-            surrounding_circle = Circle().surround(label_text, buff=0.2)
-            surrounding_circle.set_fill(fill_color, fill_opacity=fill_opacity)
-            surrounding_circle.set_stroke(stroke_color, stroke_width=stroke_width)
+            surrounding_circle = Circle().surround(label_text)
+            surrounding_circle.set_fill(fill_color, opacity=fill_opacity)
+            surrounding_circle.set_stroke(stroke_color, width=stroke_width)
             return VGroup(surrounding_circle, label_text)
     
         self.G = Graph(
             self.verts,
             self.edges,
-            labels={v for v in self.verts},
+            labels={v: v for v in self.verts},
             vertex_type=ParthNode,
             vertex_config=self.vertex_config,
             layout=custom_layout,
@@ -79,7 +161,7 @@ class ParthToyExample(VGroup):
             # # Optionally, add an updater so it follows the nodes:
             self.G.add_edges(
                 (2, 8),
-                edge_type=ArcBetweenPoints,
+                edge_type=GraphCompatibleArcBetweenPoints,
                 edge_config={
                     "angle": -PI / 2,
                     "stroke_color": BLACK,
@@ -100,9 +182,8 @@ class ParthToyExample(VGroup):
 
     def remove_edges(self, edges: list[Tuple[int,int]]):
         for edge in edges:
-            self.G.remove_edges(edge)
-
-        self[0] = VGroup(*self.G.edges.values())
+            self.get_edges(edge).set_opacity(0)
+            self.get_edges(edge).set_fill(opacity=0)
 
     def remove_nodes(self, nodes: list[int]):
         for node in nodes:
@@ -110,68 +191,165 @@ class ParthToyExample(VGroup):
 
         self[1] = VGroup(*self.G.vertices.values())
 
-    def change_labels(self, new_labels: dict[int, int]):
+    def change_labels(self, new_labels: dict[int, int], as_animation: bool = False):
         # Update the labels dictionary
         anims = []
-        for node, new_label in new_labels.items():
-                if node in self.labels.keys():
-                    # Get current font size
-                    node = self.get_nodes(node)
-                    
+        for node_id, new_label in new_labels.items():
+                if self.get_nodes(node_id) is not None:
+                    # Get current node components
+                    node = self.get_nodes(node_id)
                     prev_circle = node[0]
                     prev_label = node[1]
-                    label_text = MathTex(r"{%d}" % new_label, font_size=prev_label.font_size, color=BLACK)
-                    surrounding_circle = Circle().surround(label_text, buff=0.2)
-                    anims.append(surrounding_circle.animate.set_fill(prev_circle.get_fill_color(), fill_opacity=prev_circle.get_fill_opacity()))
-                    anims.append(surrounding_circle.animate.set_stroke(prev_circle.get_stroke_color(), stroke_width=prev_circle.get_stroke_width()))
-                    anims.append(prev_label.animate.become(label_text))
-                    anims.append(prev_circle.animate.become(surrounding_circle))
+                    
+                    # Create new label text with same font size and color
+                    new_label_text = MathTex(r"{%d}" % new_label, font_size=prev_label.font_size, color=BLACK)
+                    # Position the new label at the same location as the old one
+                    new_label_text.move_to(prev_label.get_center())
+                    
+                    # Create new circle that surrounds the text properly
+                    surrounding_circle = Circle().surround(new_label_text)
+                    # Position the circle at the same location as the old circle
+                    surrounding_circle.move_to(prev_circle.get_center())
+                    # Copy the visual properties from the old circle
+                    surrounding_circle.set_fill(prev_circle.get_fill_color(), opacity=prev_circle.get_fill_opacity())
+                    surrounding_circle.set_stroke(prev_circle.get_stroke_color(), width=prev_circle.get_stroke_width())
+                    
+                    # Add animations to transform the old objects into new ones
+                    if as_animation:
+                        anims.append(Transform(prev_label, new_label_text))
+                        anims.append(Transform(prev_circle, surrounding_circle))
+                    else:
+                        prev_label.become(new_label_text)
+                        prev_circle.become(surrounding_circle)
+        
         return AnimationGroup(*anims, lag_ratio=0.05)
 
 
-    def color_nodes(self, nodes: list[int], color: str):
+    def color_nodes(self, nodes: list[int], color: str, as_animation: bool = False)->AnimationGroup | None:
         anims = []
         for node in nodes:
             node_vgroup = self.get_nodes(node)
-            anims.append(node_vgroup[0].animate.set_fill(color))
-        return AnimationGroup(*anims, lag_ratio=0.05)
+            # node_vgroup[0] is the re
+            # ctangle, node_vgroup[1] is the text
+            rectangle = node_vgroup[0]
+            text_label = node_vgroup[1]
+            
+            if as_animation:
+                # Animate the rectangle fill color
+                anims.append(rectangle.animate.set_fill(color))
+                # Ensure text stays black and visible
+                anims.append(text_label.animate.set_color(BLACK))
+            else:
+                rectangle.set_fill(color)
+                text_label.set_color(BLACK)
+            
+        if as_animation:
+            return AnimationGroup(*anims, lag_ratio=0.05)
+        else:
+            return None
       
 
-    def make_edge_red(self, edge: Tuple[int,int]):
+    def animate_color_edge(self, edge: Tuple[int,int], stroke_width: float = 2, stroke_color: str = RED):
         # Remove the straight line for (2,8)
         anims = []
         if edge in self.G.edges:
             self.G.remove_edges(edge)
 
-            # # Optionally, add an updater so it follows the nodes:
-            anims.append(self.G.animate.add_edges(
+        # Always try to add the edge with new properties
+        try:
+            add_animation = self.G.animate.add_edges(
                 edge,
                 edge_config={
-                    "stroke_color": RED,
-                    "stroke_width": 2,
+                    "stroke_color": stroke_color,
+                    "stroke_width": stroke_width,
                 },
-            ))
-        return AnimationGroup(*anims, lag_ratio=0.05)
+            )
+            if add_animation is not None:
+                anims.append(add_animation)
+        except Exception:
+            # If animation creation fails, add the edge directly without animation
+            self.G.add_edges(edge, edge_config={
+                "stroke_color": stroke_color,
+                "stroke_width": stroke_width,
+            })
 
-    def make_edge_dot_red(self, edge: Tuple[int,int]):
+        new_edges = VGroup(*self.G.edges.values())
+        self[0] = new_edges
+        
+        # Return a valid animation or a do-nothing animation if anims is empty
+        if anims:
+            return AnimationGroup(*anims, lag_ratio=0.05)
+        else:
+            return Wait(0.01)  # Very short wait as fallback
+
+    def animate_arc_color_edge(self, edge: Tuple[int,int], stroke_width: float = 2, stroke_color: str = RED):
         # Remove the straight line for (2,8)
         anims = []
         if edge in self.G.edges:
             self.G.remove_edges(edge)
 
-            # # Optionally, add an updater so it follows the nodes:
-            anims.append(self.G.animate.add_edges(
+        # Always try to add the edge with new properties
+        try:
+            add_animation = self.G.animate.add_edges(
                 edge,
                 edge_type=DashedArcBetweenPoints,
                 edge_config={
                     "angle": -PI / 2,
-                    "stroke_color": RED,
-                    "stroke_width": 2,
+                    "stroke_color": stroke_color,
+                    "stroke_width": stroke_width,
                     "num_dashes": 10,
-                    "dashed_ratio": 0.5,
                 },
-            ))
+            )
+            if add_animation is not None:
+                anims.append(add_animation)
+        except Exception:
+            # If animation creation fails, add the edge directly without animation
+            self.G.add_edges(
+                edge,
+                edge_type=DashedArcBetweenPoints,
+                edge_config={
+                    "angle": -PI / 2,
+                    "stroke_color": stroke_color,
+                    "stroke_width": stroke_width,
+                    "num_dashes": 10,
+                },
+            )
+
+        new_edges = VGroup(*self.G.edges.values())
+        self[0] = new_edges
+        
+        # Return a valid animation or a do-nothing animation if anims is empty
+        if anims:
+            return AnimationGroup(*anims, lag_ratio=0.05)
+        else:
+            return Wait(0.01)  # Very short wait as fallback
+    
+    def add_edges(self, edges: list[Tuple[int,int]], stroke_width: float = 2, stroke_color: str = BLACK):
+        for edge in edges:
+            if edge in self.G.edges:
+                self.G.remove_edges(edge)
+            self.G.add_edges(edge, edge_config={"stroke_width": stroke_width, "stroke_color": stroke_color})
+
+        new_edges = VGroup(*self.G.edges.values())
+        self[0] = new_edges
+
+    def add_arc_edges(self, edges: list[Tuple[int,int]], stroke_width: float = 2, stroke_color: str = BLACK):
+        for edge in edges:
+            self.G.add_edges(edge, edge_type=GraphCompatibleArcBetweenPoints,
+                            edge_config={"stroke_width": stroke_width, "stroke_color": stroke_color})
+
+        new_edges = VGroup(*self.G.edges.values())
+        self[0] = new_edges
+
+    def reduce_opacity_of_edges(self, edges: list[Tuple[int,int]], run_time: float = 1):
+        anims = []
+        for edge in edges:
+            edge_mobj = self.get_edges(edge)
+            edge_mobj.set_opacity(0.2)
+            edge_mobj.set_fill(opacity=0)
+            anims.append(FadeIn(edge_mobj, run_time=run_time))
         return AnimationGroup(*anims, lag_ratio=0.05)
+    
              
 
 class HGDToyExample(VGroup):
@@ -179,7 +357,7 @@ class HGDToyExample(VGroup):
     This class is used to visualize the HGD decomposition of a matrix.
     It creates a binary tree
     """
-    def __init__(self, level: int, color_nodes: dict[int, str] = None, font_size: int = 24, **kwargs):
+    def __init__(self, level: int, color_nodes: dict[int, str] = None, font_size: int = 32, **kwargs):
         super().__init__(**kwargs)
         
         edges = []
@@ -249,7 +427,7 @@ class HGDToyExample(VGroup):
     def get_edges(self, edge: Tuple[int,int])->Mobject:
        return self.G.edges[edge]
     
-    def color_nodes(self, nodes: list[int], color: str):
+    def color_nodes(self, nodes: list[int], color: str, as_animation: bool = False)->AnimationGroup | None:
         anims = []
         for node in nodes:
             node_vgroup = self.get_nodes(node)
@@ -258,12 +436,19 @@ class HGDToyExample(VGroup):
             rectangle = node_vgroup[0]
             text_label = node_vgroup[1]
             
-            # Animate the rectangle fill color
-            anims.append(rectangle.animate.set_fill(color))
-            # Ensure text stays black and visible
-            anims.append(text_label.animate.set_color(BLACK))
+            if as_animation:
+                # Animate the rectangle fill color
+                anims.append(rectangle.animate.set_fill(color))
+                # Ensure text stays black and visible
+                anims.append(text_label.animate.set_color(BLACK))
+            else:
+                rectangle.set_fill(color)
+                text_label.set_color(BLACK)
             
-        return AnimationGroup(*anims, lag_ratio=0.05)
+        if as_animation:
+            return AnimationGroup(*anims, lag_ratio=0.05)
+        else:
+            return None
 
     def add_nodes(self, nodes: list[int], run_time: float = 1):
         """Reveal *nodes* (and their connecting edges) with a simple animation.
@@ -309,6 +494,7 @@ class HGDToyExample(VGroup):
         for edge in edges:
             edge_mobj = self.get_edges(edge)
             edge_mobj.set_opacity(0.2)
+            edge_mobj.set_fill(opacity=0)
             anims.append(FadeIn(edge_mobj, run_time=run_time))
         return AnimationGroup(*anims, lag_ratio=0.05)
     
@@ -329,7 +515,7 @@ class HGDToyExample(VGroup):
 
         self.G.add_edges(
             (0,1),
-            edge_type = ArcBetweenPoints,
+            edge_type = GraphCompatibleArcBetweenPoints,
             edge_config={
                 "angle": PI / 2,
                 "stroke_color": RED,
@@ -338,7 +524,7 @@ class HGDToyExample(VGroup):
         )
         self.G.add_edges(
             (5,6),
-            edge_type = ArcBetweenPoints,
+            edge_type = GraphCompatibleArcBetweenPoints,
             edge_config={
                 "angle": PI / 2,
                 "stroke_color": RED,
@@ -352,14 +538,38 @@ class HGDToyExample(VGroup):
         self[0] = new_edges
         self[1] = new_nodes
 
-    def high_node(self, nodes: list[int]):
+    def hide_nodes_and_edges(self, nodes: list[int], as_animation: bool = False):
         anims = []
         for node in nodes:
             ancestor = (node - 1) // 2
-            anims.append(FadeOut(self.get_nodes(node), run_time=self.transform_runtime))
-            anims.append(FadeOut(self.get_edges((ancestor, node)), run_time=self.transform_runtime))
-    
-        return AnimationGroup(*anims, lag_ratio=0.05)
+            if as_animation:
+                anims.append(self.get_nodes(node).animate.set_opacity(0))
+            else:
+                self.get_nodes(node).set_opacity(0)
+            #find every edge that has these nodes in them
+            edges = []
+            for edge in self.G.edges.keys():
+                if node in edge:
+                    edges.append(edge)
+            print(self.G.edges.keys())
+            print(edges)
+            for edge in edges:
+                if as_animation:
+                    anims.append(self.get_edges(edge).animate.set_opacity(0))
+                else:
+                    self.get_edges(edge).set_opacity(0)
+        if as_animation:
+            return AnimationGroup(*anims, lag_ratio=0.05)
+        else:
+            return None
+        
+    def remove_edges(self, edges: list[Tuple[int,int]]):
+        anims = []
+        for edge in edges:
+            if edge in self.G.edges:
+                self.get_edges(edge).set_opacity(0)
+                self.get_edges(edge).set_fill(opacity=0)
+        return None
         
 
 # Section2: Handles the animation and logic for the Parth solution section of the FastTrack video.
@@ -368,6 +578,11 @@ class ParthSolution():
         self.scene = scene
         self.transform_runtime = 0.5
         self.wait_time = 1
+        self.center_0 = -3.5 * RIGHT
+        self.center_1 = 3.5 * RIGHT
+        self.graph_scale = 3
+        self.matrix_scale = 5
+        
     
 
     def _parth_intergration_block(self, font_size=14, container_width=5, container_height=4) -> VGroup:
@@ -500,22 +715,6 @@ class ParthSolution():
         )
         return chart
     
-    def _get_centers_of_section(self, num_sections: int) -> list[Dot]:
-        # 1) get full frame width
-        W = self.scene.camera.frame_width
-        # 2) compute each column's width
-        w = W / num_sections
-        # 3) build a list of the 3 mid‐points
-        centers = [
-            np.array([
-                -W/2 + (i + 0.5) * w,  # x‐coordinate
-                0,                     # y‐coordinate (middle of screen)
-                0                      # z
-            ])
-            for i in range(num_sections)
-        ]
-        return [Dot(pt) for pt in centers]
-    
     def _create_paper_initial_sparse_matrix(self) -> np.ndarray:
         # Create the COO list
         row_indices = [0, 1, 1, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 7, 8, 8, 8]
@@ -612,10 +811,28 @@ class ParthSolution():
             local_permutation_vectors[i].get_brackets().set_color(BLACK)
         return local_permutation_vectors
     
-    def _global_permutation_vector(self)->Matrix:
+    def _global_permutation_vector(self, text: str = "$P_G:$", colorful: bool = True)->VGroup:
         color_nodes={0: PURPLE, 1: GREEN, 2: YELLOW, 3: BLUE, 4: GOLD, 5: MAROON, 6: TEAL}
         post_order_idx = [3, 4, 1, 5, 6, 2, 0]
         global_perm_values = [7, 5, 6, 3, 8, 2, 1, 4, 0]
+        global_permutation_vector = Matrix([global_perm_values])
+        global_permutation_vector.get_brackets().set_color(BLACK)
+        if colorful:
+            for i in range(len(global_permutation_vector.get_entries())):
+                if i < 6:
+                    global_permutation_vector.get_entries()[i].set_color(color_nodes[post_order_idx[i]])
+                else:
+                    global_permutation_vector.get_entries()[i].set_color(color_nodes[post_order_idx[6]])
+        else:
+            global_permutation_vector.get_entries().set_color(BLACK)
+        label = Tex(text, color=BLACK)
+        global_permutation_vector = VGroup(label, global_permutation_vector).arrange(RIGHT, buff=0.2)
+        return global_permutation_vector
+    
+    def _global_permutation_vector_after(self, text: str = "New $P_G$")->VGroup:
+        color_nodes={0: BLACK, 1: BLACK, 2: YELLOW, 3: BLACK, 4: BLACK, 5: MAROON, 6: TEAL}
+        post_order_idx = [3, 4, 1, 5, 6, 2, 0]
+        global_perm_values = [7, 5, 6, 2, 8, 3, 1, 4, 0]
         global_permutation_vector = Matrix([global_perm_values])
         global_permutation_vector.get_brackets().set_color(BLACK)
         for i in range(len(global_permutation_vector.get_entries())):
@@ -623,7 +840,7 @@ class ParthSolution():
                 global_permutation_vector.get_entries()[i].set_color(color_nodes[post_order_idx[i]])
             else:
                 global_permutation_vector.get_entries()[i].set_color(color_nodes[post_order_idx[6]])
-        label = MathTex(r"P_G:", color=BLACK)
+        label = Tex(text, color=BLACK)
         global_permutation_vector = VGroup(label, global_permutation_vector).arrange(RIGHT, buff=0.2)
         return global_permutation_vector
 
@@ -631,273 +848,292 @@ class ParthSolution():
 
 
     def play_parth_solution(self):
-        get_center_of_section = self._get_centers_of_section(3)
         # Entry point for Section 2 animation, with or without voiceover
         if isinstance(self.scene, VoiceoverScene):
-        #     script0 = "To accelerate fill-reducing ordering, we propose Parth which allows for reuse of the fill-reducing ordering\
-        #         computation by integrating it into well-known sparse Cholesky solvers, Apple Accelerate, CHOLMOD, and MKL Pardiso."
-        #     with self.scene.voiceover(text=script0) as tracker:
-        #         # Integration block
-        #         integration_block = self._parth_intergration_block().scale(0.8)
-        #         brace_label = BraceLabel(integration_block, text=r"\text{Reliable Solution}", buff=0.1, font_size=32).set_color(BLACK)
-        #         total_integration_block = VGroup(integration_block, brace_label)
-        #         total_integration_block.move_to(get_center_of_section[0])
-        #         self.scene.play(Create(total_integration_block), run_time=self.transform_runtime)
-        #         self.scene.wait(self.wait_time)
+            integration_block = self._parth_intergration_block().scale(0.8)
+            brace_label = BraceLabel(integration_block, text=r"\text{Reliable Solution}", buff=0.1, font_size=32).set_color(BLACK)
+            total_integration_block = VGroup(integration_block, brace_label)
+            total_integration_block.move_to(self.center_0)
+
+            parth_code = Code(
+                code_file="Materials/parth.cpp",
+                tab_width=4,
+                language="C++",
+                background="rectangle",
+                add_line_numbers=False,
+                formatter_style="monokai",
+            ).scale(0.6)
+            brace_label = BraceLabel(parth_code, text=r"\text{Easy Integration}", buff=0.1, font_size=32).set_color(BLACK)
+            total_parth_code = VGroup(parth_code, brace_label)
+
+            speedup_chart = self._create_bar_chart()
+            brace_label = BraceLabel(speedup_chart, text=r"\text{High-Performance}", buff=0.1, font_size=32).set_color(BLACK)
+            total_speedup_chart = VGroup(speedup_chart, brace_label)
+
+            total_arrange_box = VGroup(total_integration_block, total_parth_code, total_speedup_chart)
+            total_arrange_box.arrange(RIGHT, buff=1)
 
 
-        #     script1 = "With just 3 lines of code, and no tuning parameters, Parth adaptively provide high-quality fill-reducing ordering\
-        #         in challenging applications where the sparsity pattern changes rapidly."
-        #     with self.scene.voiceover(text=script1) as tracker:
-        #         parth_code = Code(
-        #             code_file="Materials/parth.cpp",
-        #             tab_width=4,
-        #             language="C++",
-        #             background="rectangle",
-        #             add_line_numbers=False,
-        #             formatter_style="monokai",
-        #         ).scale(0.6)
-        #         brace_label = BraceLabel(parth_code, text=r"\text{Easy Integration}", buff=0.1, font_size=32).set_color(BLACK)
-        #         total_parth_code = VGroup(parth_code, brace_label)
-        #         total_parth_code.next_to(total_integration_block, RIGHT, buff=1)
-        #         self.scene.play(Create(total_parth_code), run_time=self.transform_runtime)
-        #         self.scene.wait(self.wait_time)
+            script0 = "To accelerate fill-reducing ordering, we propose Parth which allows for reuse of the fill-reducing ordering\
+                computation by integrating it into well-known sparse Cholesky solvers, Apple Accelerate, CHOLMOD, and MKL Pardiso."
+            with self.scene.voiceover(text=script0) as tracker:
+                # Integration block
+                self.scene.play(Create(total_integration_block), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
-        #     script2 = "Its reuse capability allow for achieving up to 5.9× speedup per solves!"
-        #     with self.scene.voiceover(text=script2) as tracker:
-        #         speedup_chart = self._create_bar_chart()
-        #         speedup_chart.next_to(total_parth_code, RIGHT, buff=1)
-        #         brace_label = BraceLabel(speedup_chart, text=r"\text{High-Performance}", buff=0.1, font_size=32).set_color(BLACK)
-        #         total_speedup_chart = VGroup(speedup_chart, brace_label)
-        #         self.scene.play(Create(total_speedup_chart), run_time=self.transform_runtime)
-        #         self.scene.wait(self.wait_time)
-        #         self.scene.play(total_speedup_chart[0].animate_to_values([5.9, 3.8, 2.8], run_time=1))
-        #         self.scene.wait(self.wait_time)
 
-            
-            # parth_steps_object = ParthStepsObject(step_description=["HGD", "Integrator", "Assembler"])
-            # parth_steps_object.to_edge(UP)  
-            # script3 = "It provides this performance benefits using 3 modules, namely,"
-            # with self.scene.voiceover(text=script3) as tracker:
-            #     #Fade out of the previous mobjects
-            #     # self.scene.play(FadeOut(total_integration_block, total_parth_code, total_speedup_chart), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
-            #     #Create a the step object on the right
-            #     self.scene.play(parth_steps_object.show_steps(), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
+            script1 = "With just 3 lines of code, and no tuning parameters, Parth adaptively provide high-quality fill-reducing ordering\
+                in challenging applications where the sparsity pattern changes rapidly."
+            with self.scene.voiceover(text=script1) as tracker:
+                self.scene.play(Create(total_parth_code), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
-            # script4 = "Hirerchical graph decomposition (or HGD in short)."
-            # with self.scene.voiceover(text=script4) as tracker:
-            #     #Fade out of the previous mobjects
-            #     self.scene.play(parth_steps_object.show_steps([0]), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
+            script2 = "Its reuse capability allow for achieving up to 5.9× speedup per solves!"
+            with self.scene.voiceover(text=script2) as tracker:
+                self.scene.play(Create(total_speedup_chart), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+                self.scene.play(total_speedup_chart[0].animate_to_values([5.9, 3.8, 2.8], run_time=1))
+                self.scene.wait(self.wait_time)
 
             
-            # script5 = "Integrator."
-            # with self.scene.voiceover(text=script5) as tracker:
-            #     #Fade out of the previous mobjects
-            #     self.scene.play(parth_steps_object.show_steps([0, 1]), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
+            parth_steps_object = ParthStepsObject(step_description=["HGD", "Integrator", "Assembler"])
+            parth_steps_object.to_edge(UP)  
+            script3 = "It provides this performance benefits using 3 modules, namely,"
+            with self.scene.voiceover(text=script3) as tracker:
+                #Fade out of the previous mobjects
+                self.scene.play(FadeOut(total_integration_block, total_parth_code, total_speedup_chart), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+                #Create a the step object on the right
+                self.scene.play(parth_steps_object.show_steps(), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+
+            script4 = "Hirerchical graph decomposition (or HGD in short)."
+            with self.scene.voiceover(text=script4) as tracker:
+                #Fade out of the previous mobjects
+                self.scene.play(parth_steps_object.show_steps([0]), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
             
-            # script6 = "Assembler."
-            # with self.scene.voiceover(text=script6) as tracker:
-            #     #Fade out of the previous mobjects  
-            #     self.scene.play(parth_steps_object.show_steps([0, 1, 2]), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
+            script5 = "Integrator."
+            with self.scene.voiceover(text=script5) as tracker:
+                #Fade out of the previous mobjects
+                self.scene.play(parth_steps_object.show_steps([0, 1]), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
-            # get_center_of_section = self._get_centers_of_section(2)
-            # script7 = "In the first call to Parth, HGD algorithm get's the matrix A sparsity pattern."
-            # with self.scene.voiceover(text=script7) as tracker:
-            #     #Fade out of the previous mobjects  
-            #     self.scene.play(parth_steps_object.highlight_step(0, highlight_color=RED), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
-
-            #     #Put the sparse matrix
-            #     A_sp_initial = self._create_paper_initial_sparse_matrix()
-            #     A_sp_pattern = create_matrix_tex_pattern(row_num=A_sp_initial.shape[0], col_num=A_sp_initial.shape[1], matrix=A_sp_initial, font_size=24)
-            #     A_sp_pattern.move_to(get_center_of_section[0])
-            #     self.scene.play(Create(A_sp_pattern), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
+            
+            script6 = "and Assembler."
+            with self.scene.voiceover(text=script6) as tracker:
+                #Fade out of the previous mobjects  
+                self.scene.play(parth_steps_object.show_steps([0, 1, 2]), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
 
-            # script8 = "Then, same as other ordering algorithm, it look at matrix A as adjecent matrix of a graph."
-            # with self.scene.voiceover(text=script8) as tracker:
-            #     #Fade out of the previous mobjects  
-            #     matrix_as_graph_initial = ParthToyExample(A_sp_initial, color_nodes={0: GREY_A, 1: GREY_A, 2: GREY_A, 3: GREY_A, 4: GREY_A, 5: GREY_A, 6: GREY_A, 7: GREY_A, 8: GREY_A})
-            #     matrix_as_graph_initial.move_to(get_center_of_section[1])
-            #     matrix_to_graph_arrow = Arrow(A_sp_pattern.get_right(), matrix_as_graph_initial.get_left(), buff=0.1, stroke_width=1, color=BLACK)
-            #     self.scene.play(Create(matrix_to_graph_arrow), run_time=self.transform_runtime)
-            #     self.scene.play(FadeIn(matrix_as_graph_initial), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
+            script7 = "In the first call to Parth, HGD algorithm get's the matrix A sparsity pattern."
+            with self.scene.voiceover(text=script7) as tracker:
+                #Fade out of the previous mobjects  
+                self.scene.play(parth_steps_object.highlight_step(0, highlight_color=RED), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+
+                #Put the sparse matrix
+                A_sp_initial = self._create_paper_initial_sparse_matrix()
+                A_sp_pattern = create_manim_Matrix(row_num=A_sp_initial.shape[0], col_num=A_sp_initial.shape[1], matrix=A_sp_initial)
+                A_sp_pattern.get_brackets().set_color(BLACK)
+                A_sp_pattern.scale_to_fit_width(self.matrix_scale)
+                A_sp_pattern.move_to(self.center_0)
+                self.scene.play(Create(A_sp_pattern), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
 
-            # HGD_example = HGDToyExample(level=2, color_nodes={0: PURPLE_A, 1: GREEN_A, 2: YELLOW_A, 3: BLUE_A, 4: GOLD_A, 5: MAROON_A, 6: TEAL_A})
-            # HGD_example.move_to(get_center_of_section[1])
-            # script9 = "Given the graph, Parth start decomposing the graph and build its tree representation of decomposition. Here, \
-            #     the root of the tree with no children represent the whole graph."
-            # with self.scene.voiceover(text=script9) as tracker:
-            #     #Fade out of the previous mobjects  
-            #     self.scene.play(FadeOut(A_sp_pattern), FadeOut(matrix_to_graph_arrow), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
-            #     #Move the graph to left
-            #     self.scene.play(matrix_as_graph_initial.animate.move_to(get_center_of_section[0]), run_time=self.transform_runtime)
-            #     #Show the HGD example
-            #     new_matrix_graph_toy_example = ParthToyExample(A_sp_initial, color_nodes={0: PURPLE_A, 1: PURPLE_A, 2: PURPLE_A, 3: PURPLE_A, 4: PURPLE_A, 5: PURPLE_A, 6: PURPLE_A, 7: PURPLE_A, 8: PURPLE_A})
-            #     new_matrix_graph_toy_example.move_to(matrix_as_graph_initial.get_center())
-            #     self.scene.play(HGD_example.add_nodes([0]),
-            #                     Transform(matrix_as_graph_initial, new_matrix_graph_toy_example),
-            #                     run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
+            script8 = "Then, same as other ordering algorithm, it look at matrix A as adjecent matrix of a graph."
+            with self.scene.voiceover(text=script8) as tracker:
+                #Fade out of the previous mobjects  
+                matrix_as_graph_initial = ParthToyExample(A_sp_initial, color_nodes={0: GREY_A, 1: GREY_A, 2: GREY_A, 3: GREY_A, 4: GREY_A, 5: GREY_A, 6: GREY_A, 7: GREY_A, 8: GREY_A})
+                matrix_as_graph_initial.scale_to_fit_height(self.graph_scale)
+                matrix_as_graph_initial.move_to(self.center_1)
+                matrix_to_graph_arrow = Arrow(A_sp_pattern.get_right(), matrix_as_graph_initial.get_left(), buff=0.1, stroke_width=1, color=BLACK)
+                self.scene.play(Create(matrix_to_graph_arrow), run_time=self.transform_runtime)
+                self.scene.play(FadeIn(matrix_as_graph_initial), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
 
-            # script10 = "Parth then recursively decompose the graph into smaller subgraphs.\
-            #     It first finds a separator set, which is a small number of nodes that if removed from the graph,\
-            #         the graph will be split into two approximately equal-sized subgraphs. Here it is 1, 0 and 4. Note that\
-            #         the B-zero is now updated to represent this new set."
-            # with self.scene.voiceover(text=script10) as tracker:
-            #     #Remove the edges 
-            #     new_matrix_graph = new_matrix_graph_toy_example.copy()
-            #     new_matrix_graph.remove_edges([(4, 5), (1, 7), (1,2), (0,3), (4,8)])
-            #     self.scene.play(Transform(matrix_as_graph_initial, new_matrix_graph), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
+            HGD_example = HGDToyExample(level=2, color_nodes={0: PURPLE_A, 1: GREEN_A, 2: YELLOW_A, 3: BLUE_A, 4: GOLD_A, 5: MAROON_A, 6: TEAL_A})
+            HGD_example.move_to(self.center_1)
+            script9 = "Given the graph, Parth start decomposing the graph and build its tree representation of decomposition. In this example, \
+                the root of the tree with no children represent the whole graph."
+            with self.scene.voiceover(text=script9) as tracker:
+                #Fade out of the previous mobjects  
+                self.scene.play(FadeOut(A_sp_pattern), FadeOut(matrix_to_graph_arrow), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+                #Move the graph to left
+                self.scene.play(matrix_as_graph_initial.animate.move_to(self.center_0), run_time=self.transform_runtime)
+                #Show the HGD example
+                self.scene.play(HGD_example.add_nodes([0]),
+                                matrix_as_graph_initial.color_nodes([0, 1, 2, 3, 4, 5, 6, 7, 8], color=PURPLE_A, as_animation=True), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
 
-            # script10 = "After finding the set, the left and right subgraphs are now represent the left and right children of the root of HGD tree."
-            # with self.scene.voiceover(text=script10) as tracker:
-            #     #Fade out of the previous mobjects  
-            #     new_matrix_graph.color_nodes([5, 6, 7], color=GREEN_A)
-            #     new_matrix_graph.color_nodes([2, 3, 8], color=YELLOW_A)
+            script10 = "Parth recursively decomposes the graph by first identifying a small \
+                separator set—nodes whose removal divides the graph into two roughly equal subgraphs."
+            with self.scene.voiceover(text=script10) as tracker:
+                pass
+                    
+            script10_1 = " Here it is 1, 0 and 4." 
+            with self.scene.voiceover(text=script10_1) as tracker:
+                #Remove the edges 
+                new_matrix_graph = matrix_as_graph_initial.copy()
+                new_matrix_graph.remove_edges([(4, 5), (1, 7), (1,2), (0,3), (4,8)])
+                self.scene.play(Transform(matrix_as_graph_initial, new_matrix_graph), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+
+
+            script10 = "After finding the set, the left and right subgraphs are now represent the left and right children of the root of HGD tree."
+            with self.scene.voiceover(text=script10) as tracker:
+                #Fade out of the previous mobjects  
+                anims = []
+                anims.append(matrix_as_graph_initial.color_nodes([5, 6, 7], color=GREEN_A, as_animation=True))
+                anims.append(matrix_as_graph_initial.color_nodes([2, 3, 8], color=YELLOW_A, as_animation=True))
+                self.scene.play(*anims, HGD_example.add_nodes([1, 2]), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+
+            # color_nodes={0: PURPLE_A, 1: GREEN_A, 2: YELLOW_A, 3: BLUE_A, 4: GOLD_A, 5: MAROON_A, 6: TEAL_A})
+            script11 = "This recursive process continues with the next leaves nodes in the tree,\
+            until a pre-determined level is reached., here the level is 2."
+            with self.scene.voiceover(text=script11) as tracker:
+                #Fade out of the previous mobjects  
+                tmp_graph = matrix_as_graph_initial.copy()
+                tmp_graph.remove_edges([(2, 8), (2, 3), (6,7), (5,6)])
                 
-            #     self.scene.play(Transform(matrix_as_graph_initial, new_matrix_graph), HGD_example.add_nodes([1, 2]), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
+                tmp_graph.color_nodes([5], color=GOLD_A, as_animation=False)
+                tmp_graph.color_nodes([7], color=BLUE_A, as_animation=False)
+                tmp_graph.color_nodes([3], color=MAROON_A, as_animation=False)
+                tmp_graph.color_nodes([8], color=TEAL_A, as_animation=False)
+                self.scene.play(Transform(matrix_as_graph_initial, tmp_graph), HGD_example.add_nodes([3, 4, 5, 6]), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
-            # # color_nodes={0: PURPLE_A, 1: GREEN_A, 2: YELLOW_A, 3: BLUE_A, 4: GOLD_A, 5: MAROON_A, 6: TEAL_A})
-            # script11 = "This recursive process continues with the next leaves nodes in the tree,\
-            # until a pre-determined level is reached., here the level is 2."
-            # with self.scene.voiceover(text=script11) as tracker:
-            #     #Fade out of the previous mobjects  
-            #     new_matrix_graph.remove_edges([(2, 8), (2, 3), (6,7), (5,6)])
-            #     new_matrix_graph.color_nodes([5], color=GOLD_A)
-            #     new_matrix_graph.color_nodes([7], color=BLUE_A)
-            #     new_matrix_graph.color_nodes([3], color=MAROON_A)
-            #     new_matrix_graph.color_nodes([8], color=TEAL_A)
-            #     self.scene.play(Transform(matrix_as_graph_initial, new_matrix_graph), HGD_example.add_nodes([3, 4, 5, 6]), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
 
-            # center0 = matrix_as_graph_initial.get_center()
-            # center1 = HGD_example.get_center()
-            # script12 = "Since we are in initialization phase, there is no change to be integrated, thus Parth moves to assembler step."
-            # with self.scene.voiceover(text=script12) as tracker:
-            #     #Fade out of the previous mobjects  
-            #     self.scene.play(FadeOut(matrix_as_graph_initial), run_time=self.transform_runtime)
-            #     self.scene.play(parth_steps_object.highlight_step(2, highlight_color=RED),
-            #                     HGD_example.animate.move_to(center0), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
+            script12 = "Since we are in initialization phase, there is no change to be integrated, thus Parth moves to assembler step."
+            with self.scene.voiceover(text=script12) as tracker:
+                #Fade out of the previous mobjects  
+                self.scene.play(FadeOut(matrix_as_graph_initial), run_time=self.transform_runtime)
+                self.scene.play(parth_steps_object.highlight_step(2, highlight_color=RED),
+                                HGD_example.animate.move_to(self.center_0), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
             
-            # script13 = "In the assembler phase, for each node in the HGD tree,\
-            #     which represents a subgraph, Parth computes a local permutation vector and \
-            #     then assembles them into the global permutation vector."
-            # with self.scene.voiceover(text=script13) as tracker:
-            #     pass
+            script13 = "In the assembler phase, for each node in the HGD tree,\
+                which represents a subgraph, Parth computes a local permutation vector and \
+                then assembles them into the global permutation vector."
+            with self.scene.voiceover(text=script13) as tracker:
+                pass
 
             
 
-            # post_order_traversal = self._get_post_order_traversal()
-            # post_order_traversal.scale_to_fit_width(5)
+            post_order_traversal = self._get_post_order_traversal()
+            post_order_traversal.scale_to_fit_width(5)
 
-            # offset_per_subgraph = self._offset_per_subgraph()
-            # offset_per_subgraph.scale_to_fit_width(post_order_traversal.get_width())
+            offset_per_subgraph = self._offset_per_subgraph()
+            offset_per_subgraph.scale_to_fit_width(post_order_traversal.get_width())
 
-            # global_perm = self._global_permutation_vector()
-            # global_perm.scale_to_fit_width(offset_per_subgraph.get_width() * 1.2)
+            global_perm = self._global_permutation_vector()
+            global_perm.scale_to_fit_width(offset_per_subgraph.get_width() * 1.2)
 
-            # positing = VGroup(post_order_traversal, offset_per_subgraph, global_perm)
-            # positing.arrange(DOWN, aligned_edge=RIGHT, buff=0.5)
-            # positing.to_edge(RIGHT, buff=1)
-
-            
-            # script14 = "To do that, it first finds the offset to identify the placement of each local permutation vector\
-            #     based on the post-order traversal of the HGD tree representation.\ Here, this vector shows the post-order traversal of this tree."
-            # with self.scene.voiceover(text=script14) as tracker:
-            #     self.scene.play(Write(post_order_traversal), run_time=self.transform_runtime)
-
-            # script15 = "Then using the number of nodes in each sub-graph representation,\
-            #     it computes the offset for placing each local permutation vector withing global permutation vector\
-            #         Note that the colored offset show the starting index of local permutation vector related to each sub-graph."
-            # with self.scene.voiceover(text=script15) as tracker:
-            #     self.scene.play(FadeOut(HGD_example), FadeIn(matrix_as_graph_initial), run_time=self.transform_runtime * 2)
-            #     self.scene.wait(self.wait_time)
-            #     self.scene.play(Write(offset_per_subgraph), run_time=self.transform_runtime)
-
-
-
-            # script15 = "Then, it computes the local permutation vectors for each subgraph\
-            #     and then integrate the local vectors into the global permutation vector.\
-            #         Here, the final global permutation vector are shown. The color indicates where each local permutation vector is placed in the global permutation vector."
-            # with self.scene.voiceover(text=script15) as tracker:
-            #     self.scene.play(Write(global_perm), run_time=self.transform_runtime)
-
-
-            # script15_1 = "To complete the example, Let's focus on computation of local permutation vector related to B-zero."
-            # with self.scene.voiceover(text=script15_1) as tracker:
-            #     local_graph = new_matrix_graph.copy()
-            #     local_graph.remove_nodes([5, 6, 7, 2, 3, 8])
-            #     local_perm_in_global_perm = global_perm[1].get_entries()[6:]
-            #     local_perm_in_global_perm_rect = SurroundingRectangle(local_perm_in_global_perm, buff=0.1, color=PURPLE)
-            #     self.scene.play(FadeOut(matrix_as_graph_initial), FadeIn(local_graph),
-            #                     Create(local_perm_in_global_perm_rect), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
-
-            # script15_2 = "First, Parth re-name the B-zero sub-graph with local indices."
-            # with self.scene.voiceover(text=script15_2) as tracker:
-            #     renamed_local_graph = local_graph.copy()
-            #     renamed_local_graph.change_labels({0: 0, 1: 1, 4: 2})
-            #     self.scene.play(local_graph.animate.to_edge(LEFT, buff=1), run_time=self.transform_runtime)
-            #     renamed_local_graph.next_to(local_graph, RIGHT, buff=1)
-            #     arrow_graph = Arrow(local_graph.get_right(), renamed_local_graph.get_left(), color=PURPLE)
-            #     self.scene.play(Create(arrow_graph), Create(renamed_local_graph), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
-
-            # local_perm = Matrix([[1, 2, 0]], color=PURPLE)
-            # local_perm.get_brackets().set_color(BLACK)
-            # local_perm.get_entries().set_color(PURPLE)
-            # local_perm.scale_to_fit_width(1.5)
-            # local_perm_in_global_perm = Matrix([[1, 4, 0]], color=PURPLE)
-            # local_perm_in_global_perm.get_brackets().set_color(BLACK)
-            # local_perm_in_global_perm.get_entries().set_color(PURPLE)
-            # local_perm_in_global_perm.scale_to_fit_width(1.5)
-            # local_order_group = VGroup(local_perm, local_perm_in_global_perm)
-            # local_order_group.arrange(DOWN, aligned_edge=RIGHT, buff=1)
-            # local_order_group.next_to(renamed_local_graph, RIGHT, buff=1)
+            positing = VGroup(post_order_traversal, offset_per_subgraph, global_perm)
+            positing.arrange(DOWN, aligned_edge=RIGHT, buff=0.5)
+            positing.to_edge(RIGHT, buff=1)
 
             
-            # script15_3 = "Then, a local permutation vector is computed, using fill-reducing ordering algorithms such as metis"
-            # with self.scene.voiceover(text=script15_3) as tracker:
-            #     self.scene.play(Create(local_perm), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
+            script14 = "To do that, it first finds the offset to identify the placement of each local permutation vector\
+                based on the post-order traversal of the HGD tree representation.\ Here, this vector shows the post-order traversal of this tree."
+            with self.scene.voiceover(text=script14) as tracker:
+                self.scene.play(Write(post_order_traversal), run_time=self.transform_runtime)
 
-            # script15_4 = "finally this local permutation vector is mapped into the global permutation vector,\
-            #       by converting the node indices to their corresponding global names."
-            # with self.scene.voiceover(text=script15_4) as tracker:
-            #     arrow_perm = Arrow(local_perm.get_bottom(), local_perm_in_global_perm.get_top(), color=PURPLE)
-            #     self.scene.play(Create(arrow_perm), Create(local_perm_in_global_perm), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
+            script15 = "Then using the number of nodes in each sub-graph representation,\
+                it computes the offset for placing each local permutation vector withing global permutation vector\
+                    Note that the colored offset show the starting index of local permutation vector related to each sub-graph."
+            with self.scene.voiceover(text=script15) as tracker:
+                self.scene.play(FadeOut(HGD_example), FadeIn(matrix_as_graph_initial), run_time=self.transform_runtime * 2)
+                self.scene.wait(self.wait_time)
+                self.scene.play(Write(offset_per_subgraph), run_time=self.transform_runtime)
 
-            # script16 = "Once the assembler step is complete, the permutation vector is going to be reused until\
-            #     a subsequent change in sparsity pattern occurs."
-            # with self.scene.voiceover(text=script16) as tracker:
-            #     pass
 
-            # script17 = "When the sparsity pattern changes, Parth start the integrator step\
-            #     to update the HGD tree representation."
-            # with self.scene.voiceover(text=script17) as tracker:
-            #     #fadeOut everything but parth_step_object
-            #     objects_to_fade = [local_graph, renamed_local_graph, arrow_graph, arrow_perm,local_order_group, positing, local_perm_in_global_perm_rect]
-            #     self.scene.play(FadeOut(*objects_to_fade), run_time=self.transform_runtime)
-            #     self.scene.play(parth_steps_object.highlight_step(1, highlight_color=RED), run_time=self.transform_runtime)
-            #     self.scene.wait(self.wait_time)
+
+            script15 = "Then, it computes the local permutation vectors for each subgraph\
+                and then integrate the local vectors into the global permutation vector.\
+                    Here, the final global permutation vector are shown. The color indicates where each local permutation vector is placed in the global permutation vector."
+            with self.scene.voiceover(text=script15) as tracker:
+                self.scene.play(Write(global_perm), run_time=self.transform_runtime)
+
+
+            local_graph = matrix_as_graph_initial.copy()
+            local_graph.remove_nodes([5, 6, 7, 2, 3, 8])
+                
+            renamed_local_graph = local_graph.copy()
+            renamed_local_graph.next_to(local_graph.get_nodes(0), RIGHT, buff=1)
+
+            arrow_graph = Arrow(local_graph.get_nodes(0).get_right(), renamed_local_graph.get_nodes(0).get_left(), color=PURPLE)
+
+            local_graph_group = VGroup(local_graph, renamed_local_graph, arrow_graph)
+
+            local_perm = Matrix([[1, 2, 0]], color=PURPLE)
+            local_perm.get_brackets().set_color(BLACK)
+            local_perm.get_entries().set_color(PURPLE)
+            local_perm.scale_to_fit_width(1.5)
+
+            local_perm_2 = Matrix([[1, 4, 0]], color=PURPLE)
+            local_perm_2.get_brackets().set_color(BLACK)
+            local_perm_2.get_entries().set_color(PURPLE)
+            local_perm_2.scale_to_fit_width(local_perm.get_width())
+
+            local_order_group = VGroup(local_perm, local_perm_2)
+            local_order_group.arrange(DOWN, aligned_edge=RIGHT, buff=1)
+            local_order_group.next_to(renamed_local_graph.get_nodes(0), RIGHT, buff=1)
+
+            total_order_procedure_group = VGroup(local_graph_group, local_order_group)
+
+            total_order_procedure_group.move_to(self.center_0)
+            renamed_local_graph.change_labels({0: 0, 1: 1, 4: 2}, as_animation=False)
+
+            script15_1 = "To complete the example, Let's focus on computation of local permutation vector related to B0."
+            with self.scene.voiceover(text=script15_1) as tracker:    
+                local_perm_in_global_perm = global_perm[1].get_entries()[6:]
+                local_perm_in_global_perm_rect = SurroundingRectangle(local_perm_in_global_perm, buff=0.1, color=PURPLE)
+                self.scene.play(ReplacementTransform(matrix_as_graph_initial, local_graph),
+                                Create(local_perm_in_global_perm_rect), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+
+            script15_2 = "First, Parth re-name the B-zero sub-graph with local indices."
+            with self.scene.voiceover(text=script15_2) as tracker:
+                self.scene.play(FadeIn(local_graph), Create(arrow_graph), Create(renamed_local_graph), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+
+
+            
+            script15_3 = "Then, a local permutation vector is computed, using fill-reducing ordering algorithms such as metis"
+            with self.scene.voiceover(text=script15_3) as tracker:
+                self.scene.play(Create(local_perm), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+
+            script15_4 = "finally this local permutation vector is mapped into the global permutation vector,\
+                  by converting the node indices to their corresponding global names."
+            with self.scene.voiceover(text=script15_4) as tracker:
+                arrow_perm = Arrow(local_perm.get_bottom(), local_perm_2.get_top(), color=PURPLE)
+                self.scene.play(Create(arrow_perm), Create(local_perm_2), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+
+            script16 = "Once the assembler step is complete, the permutation vector is going to be reused until\
+                a subsequent change in sparsity pattern occurs."
+            with self.scene.voiceover(text=script16) as tracker:
+                pass
+
+            script17 = "When the sparsity pattern changes, Parth start the integrator step\
+                to update the HGD tree representation."
+            with self.scene.voiceover(text=script17) as tracker:
+                #fadeOut everything but parth_step_object
+                objects_to_fade = [local_graph, renamed_local_graph, arrow_graph,
+                                arrow_perm,local_order_group, positing, local_perm_in_global_perm_rect]
+                self.scene.play(FadeOut(*objects_to_fade), run_time=self.transform_runtime)
+                self.scene.play(parth_steps_object.highlight_step(1, highlight_color=RED), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
             script18 = "Here two non-zero entries are added and one is removed.\
                 This changes the connectivity of the graph as shown."
@@ -933,6 +1169,8 @@ class ParthSolution():
                 new_graph.move_to(new_matrix_pattern.get_center())
                 old_graph = ParthToyExample(old_matrix, color_nodes={0: GREY_A, 1: GREY_A, 2: GREY_A, 3: GREY_A, 4: GREY_A, 5: GREY_A, 6: GREY_A, 7: GREY_A, 8: GREY_A})
                 old_graph.move_to(old_matrix_pattern.get_center())
+                new_graph.scale_to_fit_height(3)
+                old_graph.scale_to_fit_height(3)
                 self.scene.play(FadeIn(new_graph, old_graph), run_time=self.transform_runtime)
                 self.scene.wait(self.wait_time)
 
@@ -941,56 +1179,117 @@ class ParthSolution():
             with self.scene.voiceover(text=script20) as tracker:
                 node_0_center = old_graph.G.vertices[0].get_center()
                 self.scene.play(new_graph.animate.move_to(node_0_center), run_time=self.transform_runtime * 3)
-                new_graph.make_edge_red((0,6))
-                new_graph.make_edge_red((3,8))
-                old_graph.make_edge_dot_red((2,8))
                 self.scene.wait(self.wait_time)
-                self.scene.remove(new_graph, old_graph)
-                self.scene.add(new_graph, old_graph)
-                color_nodes={0: PURPLE_A, 1: GREEN_A, 2: YELLOW_A, 3: BLUE_A, 4: GOLD_A, 5: MAROON_A, 6: TEAL_A}
-                node_to_hmd_node = {0: 0, 1: 0, 2: 2, 3: 5, 4: 0, 5: 4, 6: 1, 7: 3, 8: 6}
-                self.scene.wait(self.wait_time)
+                # Change edges one by one to avoid conflicts
                 self.scene.play(FadeOut(new_graph, old_graph), run_time=self.transform_runtime)
+                new_graph.animate_color_edge((0,6), stroke_color=RED, stroke_width=4)
+                new_graph.animate_color_edge((3,8), stroke_color=RED, stroke_width=4)
+                new_graph.animate_arc_color_edge((2,8), stroke_color=RED, stroke_width=4)
+                self.scene.play(FadeIn(new_graph), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+                self.scene.play(FadeOut(new_graph), run_time=self.transform_runtime)
 
             script20_1 = "Then, it maps these changes into the HGD tree representation. Here, the added edges 0 to 6 in the graph is mapped to a change between subgraphs B0 to B1,\
             and the added and removed edges 3 to 8, and 2 to 8 are mapped to a change between subgraphs B5 to B6 and B2 to B6 respectively."
             with self.scene.voiceover(text=script20_1) as tracker:
-                for node in node_to_hmd_node.keys():
-                        new_graph.color_nodes([node], color_nodes[node_to_hmd_node[node]])
+                color_nodes={0: PURPLE_A, 1: GREEN_A, 2: YELLOW_A, 3: BLUE_A, 4: GOLD_A, 5: MAROON_A, 6: TEAL_A}
+                node_to_hmd_node = {0: 0, 1: 0, 2: 2, 3: 5, 4: 0, 5: 4, 6: 1, 7: 3, 8: 6}
+                anims = []
+                # Create the HGD example and add it to the scene first
                 HGD_example = HGDToyExample(level=2, color_nodes={0: PURPLE_A, 1: GREEN_A, 2: YELLOW_A, 3: BLUE_A, 4: GOLD_A, 5: MAROON_A, 6: TEAL_A})
+                HGD_example.to_edge(RIGHT, buff=1)
+                HGD_example.scale_to_fit_height(new_graph.get_height())
+                
+                # Create animations for node coloring
+                for node in node_to_hmd_node.keys():
+                    new_graph.color_nodes([node], color_nodes[node_to_hmd_node[node]], as_animation=False)
+                
+                # Play the node coloring and HGD tree creation together
                 HGD_example.add_changed_edges()
                 HGD_example.add_nodes([0, 1, 2, 3, 4, 5, 6])
-                HGD_example.to_edge(RIGHT, buff=1)
-                self.scene.play(FadeIn(new_graph, HGD_example), run_time=self.transform_runtime)
+                self.scene.play(FadeIn(new_graph), FadeIn(HGD_example), run_time=self.transform_runtime)
                 self.scene.wait(self.wait_time)
 
             script21 = "As can be seen, only the change between subgraph B5 to B6 violates the separator set condition. That is, \
-                B2 no longer separates the B5 and B6 subgraphs. Thus, the integrator should resolve this conflict and integrate this new information into HGD."
+                B2 no longer separates the B5 and B6 subgraphs. In other word, 2 no longers separates 3 from 8 as they are connected directly now.\
+                    Thus, the integrator should resolve this conflict and integrate this new information into HGD."
             with self.scene.voiceover(text=script21) as tracker:
-                self.scene.play(HGD_example.reduce_opacity_of_edges([(0,1), (2,6)], run_time=self.transform_runtime))
+                new_graph.add_edges([(0,6), (2,8)], stroke_width=2, stroke_color=BLACK)
+                new_graph.remove_edges([(2,8)])
+
+                self.scene.play(HGD_example.reduce_opacity_of_edges([(0,1), (2,6)]), FadeIn(new_graph), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
                 pass
                 
 
-            script22 = "To do that, Parth first finds the coarse-grain subgraphs that encompasses the changes,\
-                here subgraphs B2, B5, and B6 which encompass nodes 2, 3, and 8 respectively."
+            script22 = "To do that, Parth first finds the coarse-grain subgraphs by finding the subtree of the invalid separator set.\
+                Here, subgraphs B2, B5, and B6 are in this subtree which encompasses nodes 2, 3, and 8 respectively."
             with self.scene.voiceover(text=script22) as tracker:
-                self.scene.play(HGD_example.color_nodes([2, 5, 6], color=RED_A),
-                                HGD_example.color_nodes([0, 1, 3, 4], color=GREY_A),
-                                run_time=self.transform_runtime)
+                color_nodes={0: GREY_A, 1: GREY_A, 2: RED_A, 3: GREY_A, 4: GREY_A, 5: RED_A, 6: RED_A}
+                node_to_hmd_node = {0: 0, 1: 0, 2: 2, 3: 5, 4: 0, 5: 4, 6: 1, 7: 3, 8: 6}
+                for node in node_to_hmd_node.keys():
+                    new_graph.color_nodes([node], color_nodes[node_to_hmd_node[node]], as_animation=False)
+                HGD_example.color_nodes([2, 5, 6], color=RED_A, as_animation=False)
+                HGD_example.color_nodes([0, 1, 3, 4], color=GREY_A, as_animation=False)
+                self.scene.play(FadeIn(HGD_example), FadeIn(new_graph), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
+            script23 = "Then, it re-decompose the coarse-grain subgraph\
+                to find valid separator set and updates the corresponding nodes in HGD representation."
+            with self.scene.voiceover(text=script23) as tracker:
+                self.scene.play(HGD_example.hide_nodes_and_edges([5, 6], as_animation=True), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+                color_nodes={0: PURPLE_A, 1: GREEN_A, 2: YELLOW_A, 3: BLUE_A, 4: GOLD_A, 5: MAROON_A, 6: TEAL_A}
+                color_nodes={0: GREY_A, 1: GREY_A, 2: YELLOW_A, 3: GREY_A, 4: GREY_A, 5: MAROON_A, 6: TEAL_A}
+                node_to_hmd_node = {0: 0, 1: 0, 2: 5, 3: 2, 4: 0, 5: 4, 6: 1, 7: 3, 8: 6}
+                for node in node_to_hmd_node.keys():
+                    new_graph.color_nodes([node], color_nodes[node_to_hmd_node[node]], as_animation=False)
+                HGD_example.color_nodes([2], color=color_nodes[2], as_animation=False)
+                HGD_example.color_nodes([5], color=color_nodes[5], as_animation=False)
+                HGD_example.color_nodes([6], color=color_nodes[6], as_animation=False)
+                HGD_example.add_nodes([2, 5, 6])
+                self.scene.play(FadeIn(HGD_example), FadeIn(new_graph), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
                 pass
 
-            script23 = "Then, it recomputes the subgraphs to find valid separator set and updates the corresponding nodes in HGD representation."
-            with self.scene.voiceover(text=script23) as tracker:
+            script24 = "Here, the new separator set is 3 instead of 2, and the left and right children are 2 and 8 respectively."
+            with self.scene.voiceover(text=script24) as tracker:
+                HGD_example.remove_edges([(0,1)])
+                new_graph.add_edges([(3,8)], stroke_width=2, stroke_color=BLACK)
+                self.scene.play(FadeIn(HGD_example), FadeIn(new_graph), run_time=self.transform_runtime)
                 pass
 
             script24 = "Then Parth moves to the assembler step and same as the previous time, it computes the local permutation vectors.\
                 and updates global permutation vector. Here, only updating 3 entries, reusing the rest of 6 entries, acheiving 66% reuse."
             with self.scene.voiceover(text=script24) as tracker:
-                pass            
-             
-        else:
-            pass
+                #Add parth changing step
+                self.scene.play(parth_steps_object.highlight_step(2, highlight_color=RED), run_time=self.transform_runtime)
+                center = HGD_example.get_center()
+                self.scene.play(FadeOut(new_graph), run_time=self.transform_runtime)
+                self.scene.play(HGD_example.animate.move_to(new_graph.get_center()), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+                #Add previous permutation vector
+                prev_global_perm = self._global_permutation_vector("Previous $P_G$", colorful=False)
+                new_global_perm = self._global_permutation_vector_after()
+                perm_comp_box = VGroup(prev_global_perm, new_global_perm)
+                perm_comp_box.arrange(DOWN, aligned_edge=RIGHT, buff=1)
+                perm_comp_box.scale_to_fit_width(6)
+                perm_comp_box.move_to(center)
+                prev_entries = prev_global_perm[1].get_entries()[3:6]
+                after_entries = new_global_perm[1].get_entries()[3:6]
+                box = VGroup(prev_entries, after_entries)
+                surronding_box = SurroundingRectangle(box, buff=0.1, color=RED)
+                surronding_box.set_stroke(width=2)
+                self.scene.play(FadeIn(perm_comp_box), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+                self.scene.play(Create(surronding_box), run_time=self.transform_runtime)
+                brace_label = BraceLabel(new_global_perm[1], text="6 out of 9 entries are reused", label_constructor=Tex, brace_direction=DOWN, font_size=24)
+                brace_label.set_color(BLACK)  # Set brace color
+                brace_label.set_stroke(width=0.25)
+                brace_label.label.set_color(BLACK)  # Set text color
+                brace_label.label.set_stroke(width=0.5)
+                self.scene.play(Create(brace_label), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
 
 

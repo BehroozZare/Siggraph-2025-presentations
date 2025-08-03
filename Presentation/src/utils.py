@@ -38,7 +38,7 @@ def create_upper_triangular_matrix(matrix: np.ndarray) -> np.ndarray:
     return upper_triangular_matrix
     
 
-def create_matrix_tex_pattern(row_num: int, col_num: int, matrix: np.ndarray, text_color: str = BLACK, font_size: int = None) -> Tex:
+def create_matrix_tex_pattern(row_num: int, col_num: int, matrix: np.ndarray, text_color: str = BLACK, font_size: int = None) -> Matrix:
     # Create the LaTeX matrix string for visualization
     # In the diagonal it has the number of row/col
     col_align = "|" + "c" * col_num + "|"
