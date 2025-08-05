@@ -34,7 +34,7 @@ class Title():
       title.center()
       author_names = self.make_author_names()
       author_names.next_to(title, DOWN)
-      self.scene.play(Write(title), Write(author_names), run_time=self.write_time)
+      self.scene.add(title, author_names)
       self.scene.wait(self.wait_time)
 
     def play_title(self):

@@ -132,7 +132,7 @@ class Background():
 
     def _create_eq_group(self, A_mat: np.ndarray) -> VGroup:
         #Create the dense matrix
-        A_pattern = create_matrix_tex_pattern(A_mat.shape[0], A_mat.shape[1], A_mat, font_size=self.value_font_size)
+        A_pattern = create_manim_Matrix(A_mat.shape[0], A_mat.shape[1], A_mat)
         A_word = MathTex(r"A", color=self.text_color, font_size=self.label_font_size)
 
         # Multiplication of A and x
@@ -158,10 +158,10 @@ class Background():
     def _create_llt_group(self, L: np.ndarray, x_pattern: Tex, b_pattern: Tex) -> VGroup:
         # Create the lower and upper triangular matrices
         L_mat = create_lower_triangular_matrix(L)
-        L_pattern = create_matrix_tex_pattern(L_mat.shape[0], L_mat.shape[1], L_mat, font_size=self.value_font_size)
+        L_pattern = create_manim_Matrix(L_mat.shape[0], L_mat.shape[1], L_mat)
         
         Lt_mat = create_upper_triangular_matrix(L.T)
-        Lt_pattern = create_matrix_tex_pattern(Lt_mat.shape[0], Lt_mat.shape[1], Lt_mat, font_size=self.value_font_size)
+        Lt_pattern = create_manim_Matrix(Lt_mat.shape[0], Lt_mat.shape[1], Lt_mat)
         
         # Write LL^t
         mult_sign = MathTex(r"\times", color=self.text_color, font_size=self.label_font_size)
@@ -296,6 +296,8 @@ class Background():
         boxed = LabeledBox(coo_scene_object, "COO", stroke_color=self.text_color, label_font_size=self.label_font_size)
         
         return boxed
+    
+
 
     def _create_csr_scene_object(self) -> VGroup:
         row_indices = [0, 1, 3, 5, 7, 10, 12, 14, 17, 20]
@@ -339,181 +341,44 @@ class Background():
  
     def play_background(self):
         self._create_solver_pipeline()
-        centers = self._get_centers_of_section(3)
 
         # Entry point for Section 1 animation, with or without voiceover
         if isinstance(self.scene, VoiceoverScene):
-            # scripts = "Solving a symmetric semi-positive definite system of linear equations is a core numerical task in many applications. \
-            # For accurate computations of the solution 'X', a direct methods such Cholesky factorization is used. \
-            # The Cholesky factorization decompose the matrix into the multiplecation of a lower triangular matrix and its transpose. \
-            # Followed by a forward and backward substitution to solve for the solution 'X'. \
-            # Often time, in applications such as those using Finite Element methods, The matrix A is sparse.\
-            # In these applications, approximately more than 95\% of the entries are zero.\
-            # To exploit this sparsity, the matrix is stored in sparse formats, such as Coordinate list, or compressed row-format.\
-            # To have fast codes with these format, state-of-the-art sparse solvers employ two steps.\
-            # First, the sparsity pattern of matrix A is analyzed in the phase called symbolic analysis. Where depending on the sparsity \
-            # a set of acceleration techniques are selected and used for faster execution of numerical computations. \
-            # Second, the numerical computations are performed in the phase called numeric analysis. \
-            # While the symbolic analysis is often time more expensive than the executor, this two-step approach is justifiable, as in \
-            # these applications, often time the symbolic analysis is only performed once, and the numeric analysis is performed multiple times."
-            script1 = "Solving systems of linear equations is a common task in many computational applications."
-            arrow_system_to_factor = None
-            arrow_factor_to_forward_backward = None
-            arrow_sparse_to_coo = None
-            with self.scene.voiceover(text=script1) as tracker:    
-                self.scene.play(Write(self.linear_sys_definition), run_time=self.transform_runtime)
-                self.scene.wait(self.wait_time)
-                self.dense_eq.move_to(self.linear_sys_definition.get_center())
-                self.scene.play(ReplacementTransform(self.linear_sys_definition, self.dense_eq), run_time=self.transform_runtime)
-                self.scene.wait(self.wait_time)
+            script1 = "Many applications in geometric processing and physics simulation require solving a sparse symmetric semi-positive definite system of linear equations."
+            with self.scene.voiceover(text=script1) as tracker:
+                pass
 
-            script2 = "Here we are focusing on Cholesky factorization, which decomposes the matrix into lower and upper triangular matrices."
+            script2 = "For example, here we can smooth out a mesh by successive application of the Laplacian matrix.\
+                Where a linear system of equations is solved at each step."
             with self.scene.voiceover(text=script2) as tracker:
-                # Scale and move up
-                self.scene.play(self.dense_eq.animate.scale(self.scale_factor).move_to(centers[0]), run_time=self.transform_runtime)
+                pass
 
-                self.dense_llt_eq.scale(self.scale_factor)
-                self.dense_llt_eq.move_to(centers[1])
-
-                #Create an arrow from dense to sparse llt eq
-                arrow_system_to_factor = Arrow(self.dense_eq.get_right(), self.dense_llt_eq.get_left(), stroke_width=self.arrow_stroke_width, color=self.text_color)
-                self.scene.play(Create(arrow_system_to_factor), run_time=self.arrow_runtime)
-                self.scene.play(FadeIn(self.dense_llt_eq), run_time=self.transform_runtime)
-                self.scene.wait(self.wait_time)
-
-                #Create an arrow to forward_backward_block
-                self.dense_forward_backward_block.scale(self.scale_factor)
-                self.dense_forward_backward_block.move_to(centers[2])
-
-
-            script3 = "The decomposition is followed by forward and backward substitution to compute the solution"
+            script3 = "Also note that while the sparsity pattern is constant, the values are changing."
             with self.scene.voiceover(text=script3) as tracker:
-                arrow_factor_to_forward_backward = Arrow(self.dense_llt_eq.get_right(), self.dense_forward_backward_block.get_left(), stroke_width=self.arrow_stroke_width, color=self.text_color)
-                self.scene.play(Create(arrow_factor_to_forward_backward), run_time=self.arrow_runtime)
-                self.scene.play(FadeIn(self.dense_forward_backward_block), run_time=self.transform_runtime)
-                self.scene.wait(self.wait_time)
-
-            script4 = "For Finite Element Method, the linear system is often symmetric and sparse."
-            with self.scene.voiceover(text=script4) as tracker:
-                #Sparse pipeline
-                self.sparse_eq.move_to(self.dense_eq.get_center())
-                self.sparse_eq.scale(self.scale_factor)
-
-                self.sparse_llt_eq.move_to(self.dense_llt_eq.get_center())
-                self.sparse_llt_eq.scale(self.scale_factor)
-
-                self.sparse_forward_backward_block.move_to(self.dense_forward_backward_block.get_center())
-                self.sparse_forward_backward_block.scale(self.scale_factor)
-
-                self.scene.wait(self.wait_time)
-                self.scene.play(ReplacementTransform(self.dense_eq, self.sparse_eq),
-                                ReplacementTransform(self.dense_llt_eq, self.sparse_llt_eq),
-                                ReplacementTransform(self.dense_forward_backward_block, self.sparse_forward_backward_block), run_time=self.transform_runtime)
-                sparse_matrix_label = BraceLabel(self.sparse_eq, text=r"\text{More than 95\% Sparse}", buff=0.1, font_size=self.label_font_size).set_color(self.text_color)
-                sparse_matrix_label.next_to(self.sparse_eq[0][0], DOWN)
-                self.scene.wait(self.wait_time)
-                self.scene.play(FadeIn(sparse_matrix_label), run_time=self.transform_runtime)
-                self.scene.wait(self.wait_time)
-
-            script5 = "To take advantage of the sparsity, sparse matrix formats such as Compressed Row format are proposed."
-            with self.scene.voiceover(text=script5) as tracker:
-                # Fadeout all the objects beside the linear system
-                sparse_linear_system = self.sparse_eq[0][0]
-                sparse_linear_system_label = self.sparse_eq[1]
-                A_matrix = VGroup(sparse_linear_system, sparse_linear_system_label)
-                self.scene.play(FadeOut(self.sparse_eq[0][1]),
-                                FadeOut(self.sparse_eq[0][2]),
-                                FadeOut(self.sparse_eq[0][3]),
-                                FadeOut(self.sparse_eq[0][4]),
-                                FadeOut(self.sparse_eq[2]),
-                                FadeOut(self.sparse_eq[3]),
-                                FadeOut(arrow_system_to_factor),
-                                FadeOut(self.sparse_llt_eq),
-                                FadeOut(arrow_factor_to_forward_backward),
-                                FadeOut(self.sparse_forward_backward_block),
-                                FadeOut(sparse_matrix_label),
-                                run_time=self.transform_runtime)
-                self.scene.wait(self.wait_time)
-
-                
-                self.scene.play(A_matrix.animate.scale(1 / self.scale_factor).to_edge(LEFT, buff=2), run_time=self.transform_runtime)
-                self.scene.wait(self.wait_time)
+                pass
             
-                csr_format_object = self._create_csr_scene_object()
-                csr_format_object.to_edge(RIGHT, buff=2)
-                
-                #Brace label
-                sparse_brace_label = BraceLabel(csr_format_object, text=r"\text{Sparse Format}", buff=0.1, font_size=self.label_font_size).set_color(self.text_color)
-                dense_brace_label = BraceLabel(A_matrix, text=r"\text{Dense Format}", buff=0.1, font_size=self.label_font_size).set_color(self.text_color)
+            script4 = "Here we can also see the geodestic distance computation where it requires solving a linear system of equations.\
+                However, after the first computation of the operator, finding the geodestic distance for difference sources is simply require computing for different right hand sides."
+            with self.scene.voiceover(text=script4) as tracker:
+                pass
 
-                self.scene.play(FadeIn(csr_format_object), run_time=self.transform_runtime)
-                self.scene.play(FadeIn(sparse_brace_label), FadeIn(dense_brace_label), run_time=self.transform_runtime)
+            script5 = "To have fast linear solvers for these problems, state-of-the-art tools provide symbolic-numeric framework."
+            with self.scene.voiceover(text=script5) as tracker:
+                pass
 
-            script6 = "These formats save memory. However, applying parallelism and vectorization become non-trivial.\
-            Here, for example, retrieving an element from a dense layout is straightforward, but in a sparse one, you must scan multiple non-zero entries."
+            script6 = "First, the symbolic analysis phase is performed to analyze the sparsity pattern of the matrix."
             with self.scene.voiceover(text=script6) as tracker:
-                #Fade out everythings beside the csr_Format_object
-                dense_ret_code = Code(
-                    code_file="Materials/dense.cpp",
-                    tab_width=4,
-                    language="C++",
-                    background="rectangle",
-                    add_line_numbers=False,
-                    formatter_style="monokai",
-                ).scale(0.8)
-                sparse_ret_code = Code(
-                    code_file="Materials/sparse.cpp",
-                    tab_width=4,
-                    language="C++",
-                    background="rectangle",
-                    add_line_numbers=False,
-                    formatter_style="monokai",
-                ).scale(0.8)
-                dense_ret_code.next_to(dense_brace_label, UP)
-                sparse_ret_code.next_to(sparse_brace_label, UP)
 
-                code_sparse_brace_label = BraceLabel(sparse_ret_code, text=r"\text{Sparse Format}", buff=0.1, font_size=self.label_font_size).set_color(self.text_color)
-                code_dense_brace_label = BraceLabel(dense_ret_code, text=r"\text{Dense Format}", buff=0.1, font_size=self.label_font_size).set_color(self.text_color)
+                pass
 
-
-                self.scene.play(FadeOut(csr_format_object),
-                                FadeOut(A_matrix),
-                                run_time=self.transform_runtime)
-                
-                self.scene.play(FadeIn(dense_ret_code), FadeIn(sparse_ret_code),
-                                ReplacementTransform(sparse_brace_label, code_sparse_brace_label),
-                                ReplacementTransform(dense_brace_label, code_dense_brace_label), run_time=self.transform_runtime)
-                self.scene.wait(self.wait_time)
-
-            if self.scene.mobjects:
-                self.scene.play(FadeOut(*self.scene.mobjects), run_time=0.2)
-                self.scene.wait(0.1)
-
-            script7 = "State-of-the-art sparse solvers use a two-step approach to reduce this limitation.\
-            In symbolic phase, the sparsity pattern is analyzed for applying acceleration techniques. \
-            Then, using this analysis, the numerical phase is performed, where the factorization and forward/backward substitution are performed."
+            script7 = "Then, using the symbolic analysis results, the numerical computation phase is efficiently performed to solve the linear system of equations."
             with self.scene.voiceover(text=script7) as tracker:
-                #Create two objects 
-                A_sp = self._create_paper_sparse_matrix()
-                symbolic_numeric_framework = SymbolicNumericFramework(A_sp)
-                symbolic_numeric_framework.center()
-                self.scene.play(Create(symbolic_numeric_framework), run_time=self.transform_runtime)
+                pass
 
-
-            script8 = "Here as an example, we apply laplace-beltrami operator on this mesh.\
-                The resultant matrix has approximately 7 million non-zeros with more than 99% sparsity.\
-                The symbolic analysis is performed in 1.9 seconds and the numeric computation is performed in 1 second.\
-                Note that in here, the symbolic analysis runtime is more than numeric computation for a single Cholesky solve."
+            script8 = "Note that if the sparsity pattern remains constant, the symbolic analysis can be reused,\
+                amortizing the expensive symbolic analysis overhead across multiple numerical calls."
             with self.scene.voiceover(text=script8) as tracker:
-                final_example = self._final_example()
-                final_example.center()
-                self.scene.play(FadeOut(symbolic_numeric_framework), run_time=self.transform_runtime)
-                self.scene.play(FadeIn(final_example), run_time=self.transform_runtime)
-                self.scene.wait(self.wait_time)
-                
-        
-        else:
-            self._play_scene()
+                pass
 
 
 

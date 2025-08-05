@@ -1259,8 +1259,8 @@ class ParthSolution():
                 self.scene.play(FadeIn(HGD_example), FadeIn(new_graph), run_time=self.transform_runtime)
                 pass
 
-            script24 = "Then Parth moves to the assembler step and same as the previous time, it computes the local permutation vectors.\
-                and updates global permutation vector. Here, only updating 3 entries, reusing the rest of 6 entries, acheiving 66% reuse."
+            script24 = "Then Parth moves to the assembler step and only updates the local permutation vector for the new subgraphs.\
+                In this example, only updating 3 entries related to B2, B5, and B6, reusing the rest of 6 entries, acheiving 66% reuse."
             with self.scene.voiceover(text=script24) as tracker:
                 #Add parth changing step
                 self.scene.play(parth_steps_object.highlight_step(2, highlight_color=RED), run_time=self.transform_runtime)

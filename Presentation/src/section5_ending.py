@@ -16,7 +16,6 @@ class ThankYouNote():
         self.FadeIn_time = 0.5
         self.section3_total_time = 2
         
-        
     def _parth_paper_title(self):
         title = Tex(r"Adaptive Algebraic Reuse of Reordering in Cholesky Factorizations with Dynamic Sparsity Patterns", font_size=36)
         return title
@@ -29,7 +28,7 @@ class ThankYouNote():
         paper_title = self._parth_paper_title()
         paper_title.to_edge(UP, buff=1)
         # QR code link
-        qr_code = ImageMobject("Figures/section3/qr_code.png")
+        qr_code = ImageMobject("Figures/final/qr_code.png")
         qr_code.scale_to_fit_width(paper_title.get_width() * 0.2)
         qr_code.next_to(paper_title, DOWN, buff=1)
 

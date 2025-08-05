@@ -179,9 +179,41 @@ class Results():
     def play_results(self):
         # Entry point for Section 1 animation, with or without voiceover
         if isinstance(self.scene, VoiceoverScene):
-            script1 = "We comprehensively evaluate Parth on many simulations within IPC benchmark, as well as a patch remeshing pipleine to \
-            test its performance and limitations."
+            script1 = "With Parth, we can know reusing the fill-reducing ordering computation, in challenging simulation such as this rode twist."
             with self.scene.voiceover(text=script1) as tracker:
                 pass
+
+            script2 = "In this example, we can reduce the fill-reducing ordering runtime from 1.5 seconds to 0.1 seconds."
+            with self.scene.voiceover(text=script2) as tracker:
+                pass
+
+            script3 = "We can also reuse the fill-reducing ordering not only in the presence of changes in the graph edges, but also in the graph number of nodes, such as this patching example."
+            with self.scene.voiceover(text=script3) as tracker:
+                pass
+
+            script4 = "For this example, acheving 2.9x speedup."
+            with self.scene.voiceover(text=script4) as tracker:
+                pass
+
+            script5 = "However, Parth is not a silver bullet, and it has some limitations."
+            with self.scene.voiceover(text=script5) as tracker:
+                pass
+
+            script6 = "First, Parth is only when the changes are local. So for example, for this simulation from Arcsim where the changes happen in all over the place, the reuse would be challenging."
+            with self.scene.voiceover(text=script6) as tracker:
+                pass
+
+            script7 = "Second, Parth is can provide performance benfits if the fill-reducing ordering is the major bottleneck. However, if the fill-reducing ordering is not the major bottleneck, the performance benfits would be limited."
+            with self.scene.voiceover(text=script7) as tracker:
+                pass
+
+            script8 = "As for the future work, Parth is just the beginning, because it is compatible with other symbolic analysis, we expect many more symbolic analysis adapt Parth and become avaiable for dynamic sparsity patterns."
+            with self.scene.voiceover(text=script8) as tracker:
+                pass
+
+            script9 = "Thank you for your attention."
+            with self.scene.voiceover(text=script9) as tracker:
+                pass
+
         else:
             pass

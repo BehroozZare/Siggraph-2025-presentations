@@ -38,7 +38,7 @@ def create_upper_triangular_matrix(matrix: np.ndarray) -> np.ndarray:
     return upper_triangular_matrix
     
 
-def create_matrix_tex_pattern(row_num: int, col_num: int, matrix: np.ndarray, text_color: str = BLACK, font_size: int = None) -> Matrix:
+def create_matrix_tex_pattern(row_num: int, col_num: int, matrix: np.ndarray, text_color: str = BLACK, font_size: int = None) -> Tex:
     # Create the LaTeX matrix string for visualization
     # In the diagonal it has the number of row/col
     col_align = "|" + "c" * col_num + "|"
@@ -58,12 +58,16 @@ def create_matrix_tex_pattern(row_num: int, col_num: int, matrix: np.ndarray, te
             matrix_str += r" \\ "
     matrix_str += r"\end{array}$"
 
-def create_manim_Matrix(row_num: int, col_num: int, matrix: np.ndarray) -> Matrix:
+    # Create the matrix as LaTeX and return it
+    matrix_pattern = Tex(matrix_str, color=text_color, font_size=font_size)
+    return matrix_pattern
+
+def create_manim_Matrix(row_num: int, col_num: int, matrix: np.ndarray, no_diagonal_index: bool = False) -> Matrix:
     matrix_str = []
     for i in range(row_num):
         row_parts = []
         for j in range(col_num):
-            if i == j:
+            if i == j and not no_diagonal_index:
                 row_parts.append(f"{i}")
             else:
                 if matrix[i, j] != 0:
@@ -283,9 +287,9 @@ class SymbolicNumericFramework(VGroup):
         b = create_dense_column_vector(self.A_sp.shape[0], with_values=True, text_color=self.text_color, font_size=self.value_font_size)
         
 
-        A_label = MathTex(self.matrix_name, color=self.text_color, font_size=self.label_font_size)
-        b_label = MathTex(self.rhs_name, color=self.text_color, font_size=self.label_font_size)
-        and_label = MathTex(r"\text{,}", color=self.text_color, font_size=self.label_font_size)
+        A_label = Text(self.matrix_name, color=self.text_color, font_size=self.label_font_size)
+        b_label = Text(self.rhs_name, color=self.text_color, font_size=self.label_font_size)
+        and_label = Text(",", color=self.text_color, font_size=self.label_font_size)
         and_label.next_to(A_sp_values, RIGHT, buff=0.2)
         b.next_to(and_label, RIGHT, buff=0.2)
         A_label.next_to(A_sp_values, UP)
