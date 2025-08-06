@@ -25,20 +25,21 @@ class FastTrackComplete(VoiceoverScene):
 
     def construct(self):
         # set your TTS engine once
-        self.set_speech_service(GTTSService())
+        # self.set_speech_service(GTTSService())
         self.camera.background_color = WHITE
-        # self.set_speech_service(RecorderService())
-        # — Section 1 —
-        # self.section0.play_title()
-        # if self.mobjects:
-        #     self.play(FadeOut(*self.mobjects), run_time=0.2)
-        #     self.wait(0.1)
+        self.set_speech_service(RecorderService())
+        
+        self.section0.play_title()
+        if self.mobjects:
+            self.play(FadeOut(*self.mobjects), run_time=0.2)
+            self.wait(0.1)
 
-        # self.section1.play_background()
-        # # Clear the scene
-        # if self.mobjects:
-        #     self.play(FadeOut(*self.mobjects), run_time=0.2)
-        #     self.wait(0.1)
+        #— Section 1 —
+        # Clear the scene
+        self.section1.play_background()
+        if self.mobjects:
+            self.play(FadeOut(*self.mobjects), run_time=0.2)
+            self.wait(0.1)
 
         # — Section 2 —
         self.section2.play_problem_definition()
@@ -46,11 +47,11 @@ class FastTrackComplete(VoiceoverScene):
             self.play(FadeOut(*self.mobjects), run_time=0.2)
             self.wait(0.1)
 
-        # # — Section 3 —
-        # self.section3.play_parth_solution()
-        # if self.mobjects:
-        #     self.play(FadeOut(*self.mobjects), run_time=0.2)
-        #     self.wait(0.1)
+        # — Section 3 —
+        self.section3.play_parth_solution()
+        if self.mobjects:
+            self.play(FadeOut(*self.mobjects), run_time=0.2)
+            self.wait(0.1)
 
         # # — Section 4 —
         # self.section4.play_results()

@@ -1043,13 +1043,13 @@ class ParthSolution():
 
             
             script14 = "To do that, it first finds the offset to identify the placement of each local permutation vector\
-                based on the post-order traversal of the HGD tree representation.\ Here, this vector shows the post-order traversal of this tree."
+                based on the post-order traversal of the HGD tree representation. Here, this vector shows the post-order traversal of this tree."
             with self.scene.voiceover(text=script14) as tracker:
                 self.scene.play(Write(post_order_traversal), run_time=self.transform_runtime)
 
             script15 = "Then using the number of nodes in each sub-graph representation,\
-                it computes the offset for placing each local permutation vector withing global permutation vector\
-                    Note that the colored offset show the starting index of local permutation vector related to each sub-graph."
+                it computes the offset for placing each local permutation vector withing global permutation vector.\
+                Note that the colored offset show the starting index of local permutation vector related to each sub-graph."
             with self.scene.voiceover(text=script15) as tracker:
                 self.scene.play(FadeOut(HGD_example), FadeIn(matrix_as_graph_initial), run_time=self.transform_runtime * 2)
                 self.scene.wait(self.wait_time)

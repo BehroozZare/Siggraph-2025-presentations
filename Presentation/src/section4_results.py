@@ -211,9 +211,5 @@ class Results():
             with self.scene.voiceover(text=script8) as tracker:
                 pass
 
-            script9 = "Thank you for your attention."
-            with self.scene.voiceover(text=script9) as tracker:
-                pass
-
         else:
             pass

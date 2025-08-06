@@ -313,17 +313,17 @@ class SymbolicNumericFramework(VGroup):
         symbolic_box.next_to(A_sp_pattern, RIGHT, buff=1)
         numeric_box.next_to(symbolic_box, RIGHT, buff=1)
         sym_to_num_arrow = Arrow(symbolic_box.get_right(), numeric_box.get_left(), stroke_width=self.arrow_stroke_width, color=self.arrow_color)
-        sparse_cholesky_framework = VGroup(symbolic_box, numeric_box, sym_to_num_arrow)
+        sparse_cholesky_framework = VGroup(symbolic_box, sym_to_num_arrow, numeric_box)
         sparse_cholesky_label = BraceLabel(sparse_cholesky_framework, text=r"\text{Sparse Cholesky Solver}", buff=0.1, font_size=self.label_font_size).set_color(self.arrow_color)
         numeric_input_group.next_to(numeric_box, UP, buff=1.3)
         solve_values.next_to(numeric_box, RIGHT, buff=1)
 
         arrow_pattern_to_symbolic = Arrow(A_sp_pattern.get_right(), sparse_cholesky_framework[0].get_left(), stroke_width=self.arrow_stroke_width, color=self.arrow_color)
-        arrow_solve_input_to_numeric = Arrow(numeric_input_group.get_bottom(), sparse_cholesky_framework[1].get_top(), stroke_width=self.arrow_stroke_width, color=self.arrow_color)
+        arrow_solve_input_to_numeric = Arrow(numeric_input_group.get_bottom(), sparse_cholesky_framework[2].get_top(), stroke_width=self.arrow_stroke_width, color=self.arrow_color)
         arrow_sparse_cholesky_to_solve_values = Arrow(numeric_box.get_right(), solve_values.get_left(), stroke_width=self.arrow_stroke_width, color=self.arrow_color)
 
-        solve_example = VGroup(A_pattern_group, arrow_pattern_to_symbolic, sparse_cholesky_framework, sparse_cholesky_label,
-                            numeric_input_group, arrow_solve_input_to_numeric, arrow_sparse_cholesky_to_solve_values, solve_values)
+        solve_example = VGroup(A_pattern_group, arrow_pattern_to_symbolic, sparse_cholesky_framework,
+                            numeric_input_group, arrow_solve_input_to_numeric, arrow_sparse_cholesky_to_solve_values, solve_values, sparse_cholesky_label)
         return solve_example
     
 

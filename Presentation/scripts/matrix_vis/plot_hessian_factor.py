@@ -6,9 +6,8 @@ import glob
 import matplotlib.pyplot as plt
 from scipy.io import mmread
 import numpy as np
-from scipy.sparse import csc_matrix, tril, eye
-from sksparse.cholmod import cholesky, cholesky_AAt, CholmodError
-from scipy.sparse.csgraph import reverse_cuthill_mckee
+from scipy.sparse import csc_matrix
+from sksparse.cholmod import cholesky
 try:
     import metis
     METIS_AVAILABLE = True
@@ -16,77 +15,14 @@ except ImportError:
     METIS_AVAILABLE = False
     print("METIS not available, using other ordering methods")
 
-def validate_and_preprocess_matrix(A):
-    """
-    Validate and preprocess matrix for CHOLMOD compatibility
-    """
-    print(f"Matrix validation - Shape: {A.shape}, Format: {A.format}, dtype: {A.dtype}")
-    
-    # Ensure square matrix
-    if A.shape[0] != A.shape[1]:
-        raise ValueError("Matrix must be square for Cholesky decomposition")
-    
-    # Convert to CSC format (required by CHOLMOD)
-    if A.format != 'csc':
-        print("Converting to CSC format...")
-        A = A.tocsc()
-    
-    # Ensure float64 dtype
-    if A.dtype != np.float64:
-        print("Converting to float64...")
-        A = A.astype(np.float64)
-    
-    # Properly construct symmetric matrix from lower triangular part
-    print("Constructing symmetric matrix...")
-    L = tril(A)  # Extract lower triangular part
-    U = tril(A, k=-1)  # Extract strictly lower triangular (without diagonal)
-    A_symmetric = L + U.T  # Lower triangular + transpose of strictly lower triangular
-    A_symmetric.eliminate_zeros()
-    
-    print(f"Symmetric matrix constructed: {A_symmetric.nnz:,} non-zeros")
-    
-    # Verify symmetry
-    max_diff = np.abs((A_symmetric - A_symmetric.T).data).max() if (A_symmetric - A_symmetric.T).nnz > 0 else 0.0
-    print(f"Symmetry verification - max difference: {max_diff:.2e}")
-    
-    # Use only lower triangular part for CHOLMOD
-    print("Extracting lower triangular part for CHOLMOD...")
-    A_final = tril(A_symmetric)
-    A_final.eliminate_zeros()
-    
-    # Check for positive definiteness by examining diagonal
-    diag_vals = A_final.diagonal()
-    min_diag = np.min(diag_vals)
-    max_diag = np.max(diag_vals)
-    print(f"Diagonal range: [{min_diag:.2e}, {max_diag:.2e}]")
-    
-    # Check for zeros on diagonal
-    zero_diag_count = np.sum(diag_vals == 0)
-    if zero_diag_count > 0:
-        print(f"Warning: {zero_diag_count} zeros found on diagonal")
-    
-    if min_diag <= 0:
-        print(f"Matrix may not be positive definite (min diagonal: {min_diag})")
-        print("Adding regularization...")
-        reg_strength = max(abs(min_diag) + 1e-6, 1e-8)
-        reg_matrix = reg_strength * eye(A_final.shape[0], format='csc')
-        A_final = A_final + reg_matrix
-        print(f"Added regularization: {reg_strength:.2e}")
-        
-        # Update diagonal info
-        new_min_diag = np.min(A_final.diagonal())
-        print(f"New min diagonal: {new_min_diag:.2e}")
-    
-    print(f"Final matrix: {A_final.nnz:,} non-zeros, format: {A_final.format}")
-    return A_final
-
-def perform_cholesky_factorization(A, ordering_method="natural"):
+def perform_cholesky_factorization(A, ordering_method="metis"):
     """
     Perform sparse Cholesky factorization using CHOLMOD with robust error handling
     """
     try:
         # Perform factorization
-        factor = cholesky(A, ordering_method="amd")
+        A_format = csc_matrix(A)
+        factor = cholesky(A_format, ordering_method="metis")
         L = factor.L()
         
         print(f"Factorization successful!")

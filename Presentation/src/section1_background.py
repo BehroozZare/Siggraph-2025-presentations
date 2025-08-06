@@ -8,6 +8,7 @@ from scipy.sparse.linalg import spsolve
 from scipy.linalg import cholesky
 from utils import *
 import os
+import re
 
 # 2) extend the pre-amble
 template = TexTemplate()
@@ -54,6 +55,9 @@ class Background():
         self.sparse_backward_eq = None
         self.sparse_forward_backward_eq = None
         self.sparse_forward_backward_brace = None
+
+
+        self.sim_frames = []
 
 
 
@@ -296,7 +300,6 @@ class Background():
         boxed = LabeledBox(coo_scene_object, "COO", stroke_color=self.text_color, label_font_size=self.label_font_size)
         
         return boxed
-    
 
 
     def _create_csr_scene_object(self) -> VGroup:
@@ -329,6 +332,53 @@ class Background():
         
         return boxed
 
+    def _extract_frame_index(self, filename: str) -> int:
+        #the names are number.png 
+        m = re.search(r"(\d+)", filename)
+        if not m:
+            raise ValueError(f"No digits in {filename!r}")
+        return int(m.group(1))
+    
+    def _prepare_simulations_frames(self):
+        # load & sort object renders
+        imgs = [f for f in os.listdir("scripts/fix_sparsity_example/images/") if f.endswith(".png")]
+        imgs.sort(key=self._extract_frame_index)
+        self.frame_list = [
+            ImageMobject(f"scripts/fix_sparsity_example/images/{f}") for f in imgs
+        ]
+
+        # load & sort matrix renders
+        mats = [f for f in os.listdir("scripts/fix_sparsity_example/results/") if f.endswith(".png")]
+        mats.sort(key=self._extract_frame_index)
+        self.matrix_list = [
+            ImageMobject(f"scripts/fix_sparsity_example/results/{f}") for f in mats
+        ]
+        min_size = min(len(self.frame_list), len(self.matrix_list))
+        
+        self.sim_frames = [self._show_simulation_frames(i) for i in range(min_size)]
+    
+    def _final_example(self)->Group:
+        nefertiti_obj = ImageMobject(os.path.join("Figures", 'Background', 'nefertiti.png')).scale(1.2)
+        sparse_obj = ImageMobject(os.path.join("Figures", 'Background', 'sparse_laplace.png'))
+        sparse_obj.scale_to_fit_height(nefertiti_obj.get_height())
+        nefertiti_obj.next_to(sparse_obj, RIGHT, buff=1)
+        sparse_label = BraceLabel(sparse_obj, label_constructor=Tex, text="1M $\times$ 1M and 7M non-zeros (99.99\% sparsity)", buff=0.1, font_size=self.label_font_size).set_color(self.text_color)
+        example_group = Group(nefertiti_obj, sparse_obj, sparse_label).scale_to_fit_width(12)
+        return example_group
+ 
+
+    def _show_simulation_frames(self, iteration: int)->Group:
+        #Create a VGroup of the frame and the matrix
+        frame = self.frame_list[iteration]
+        matrix = self.matrix_list[iteration]
+        frame.scale(1.2)
+        matrix.scale_to_fit_width(frame.get_width())
+        matrix.next_to(frame, LEFT, buff=1)
+        #Adding a surronding box around the matrix
+        matrix_box = SurroundingRectangle(matrix, buff=0.0, color=BLACK, stroke_width=1)
+        hessian_label = BraceLabel(matrix_box, text="Laplace Operator", label_constructor=Tex, buff=0.1, font_size=32).set_color(BLACK)
+        mat_on_board_label = BraceLabel(frame, text="LibIgl Smoothing Example", label_constructor=Tex, buff=0.1, font_size=32).set_color(BLACK)
+        return Group(frame, matrix, matrix_box, hessian_label, mat_on_board_label).scale_to_fit_height(6)
     
     def _final_example(self)->Group:
         nefertiti_obj = ImageMobject(os.path.join("Figures", 'Background', 'nefertiti.png')).scale(1.2)
@@ -344,42 +394,90 @@ class Background():
 
         # Entry point for Section 1 animation, with or without voiceover
         if isinstance(self.scene, VoiceoverScene):
+            self._prepare_simulations_frames()
             script1 = "Many applications in geometric processing and physics simulation require solving a sparse symmetric semi-positive definite system of linear equations."
             with self.scene.voiceover(text=script1) as tracker:
-                pass
+                frame_and_matrix = self.sim_frames[0]
+                frame_and_matrix.center()
+                self.scene.play(FadeIn(self.sim_frames[0]), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
             script2 = "For example, here we can smooth out a mesh by successive application of the Laplacian matrix.\
                 Where a linear system of equations is solved at each step."
             with self.scene.voiceover(text=script2) as tracker:
-                pass
+                total_time = tracker.duration
+                time_per_iteration = total_time / (len(self.frame_list) - 1)
+                rt = max(0.2, time_per_iteration)
+                for i in range(1, len(self.sim_frames)):
+                    new_frame_and_matrix = self.sim_frames[i]
+                    new_frame_and_matrix.center()
+                    self.scene.remove(frame_and_matrix)
+                    self.scene.add(new_frame_and_matrix)
+                    self.scene.wait(rt)
+                    frame_and_matrix = new_frame_and_matrix
 
             script3 = "Also note that while the sparsity pattern is constant, the values are changing."
             with self.scene.voiceover(text=script3) as tracker:
                 pass
-            
-            script4 = "Here we can also see the geodestic distance computation where it requires solving a linear system of equations.\
-                However, after the first computation of the operator, finding the geodestic distance for difference sources is simply require computing for different right hand sides."
+
+            script4 = "To have fast linear solvers for these problems, state-of-the-art tools provide symbolic-numeric framework."
             with self.scene.voiceover(text=script4) as tracker:
                 pass
 
-            script5 = "To have fast linear solvers for these problems, state-of-the-art tools provide symbolic-numeric framework."
+            sparse_matrix = create_sparse_matrix(9, 0, 0.1)
+            solver = SymbolicNumericFramework(A_sp=sparse_matrix, matrix_size=9,
+                                                            generate_random_pattern=True, generate_random_values=True,
+                                                            matrix_name="H", rhs_name="-g", unknown_name="d")
+            solver.center()
+            solver_internal = solver[0]
+            symbolic_input = solver_internal[0]
+            arrow = solver_internal[1]
+            symbolic_box = solver_internal[2][0]
+            symbolic_section = VGroup(symbolic_input, arrow, symbolic_box)
+            script5 = "In this framework, first, the symbolic analysis phase is performed to analyze the sparsity pattern of the matrix."
             with self.scene.voiceover(text=script5) as tracker:
-                pass
+                self.scene.wait(self.wait_time)
+                self.scene.play(FadeOut(frame_and_matrix), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+                self.scene.play(FadeIn(symbolic_section), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
-            script6 = "First, the symbolic analysis phase is performed to analyze the sparsity pattern of the matrix."
+            sym_to_numeric_arrow = solver_internal[2][1]
+            numeric_box = solver_internal[2][2]
+            numeric_input = solver_internal[3]
+            numeric_arrow = solver_internal[4]
+            arrow_to_solve = solver_internal[5]
+            solve_value = solver_internal[6]
+            label = solver_internal[7]
+            numeric_section = VGroup(sym_to_numeric_arrow, numeric_box, numeric_input, numeric_arrow, arrow_to_solve, solve_value, label)
+            script6 = "Then, using the symbolic analysis results, the numerical computation phase is efficiently performed to solve the linear system of equations."
             with self.scene.voiceover(text=script6) as tracker:
+                self.scene.play(FadeIn(numeric_section), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
-                pass
+            script6_1 = "In general symbolic analysis can be more expensive than the numerical computation phase.\
+                Here for laplace operator, the symbolic analysis takes 1.9s while the numerical computation takes 1s."
+            with self.scene.voiceover(text=script6_1) as tracker:
+                self.scene.play(FadeOut(solver), run_time=self.transform_runtime)
+                final_example = self._final_example()
+                final_example.center()
+                self.scene.play(FadeIn(final_example), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
 
-            script7 = "Then, using the symbolic analysis results, the numerical computation phase is efficiently performed to solve the linear system of equations."
-            with self.scene.voiceover(text=script7) as tracker:
-                pass
-
-            script8 = "Note that if the sparsity pattern remains constant, the symbolic analysis can be reused,\
+            script7 = "However if the sparsity pattern remains constant, the symbolic analysis can be reused,\
                 amortizing the expensive symbolic analysis overhead across multiple numerical calls."
-            with self.scene.voiceover(text=script8) as tracker:
-                pass
-
-
-
-#cp 12_matOnBoard_seg0/numThreads_20_SolverType_CHOLMOD_IM_0/hessian_*_0_last_IPC.mtx hessian_checkpoints/
+            with self.scene.voiceover(text=script7) as tracker:
+                self.scene.play(FadeOut(final_example), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+                total_time = tracker.duration
+                time_per_iteration = total_time / 10
+                smile_emoji = ImageMobject("Figures/Problem/smile.png").scale(0.3)
+                smile_emoji.next_to(solver[0][0], UP, buff=1)
+                self.scene.play(FadeIn(smile_emoji), run_time=self.transform_runtime)
+                for i in range(10):
+                    numeric_color = RED_A if i % 2 == 0 else GREEN_A
+                    new_framework = SymbolicNumericFramework(A_sp=sparse_matrix, iteration=i, numeric_box_color=numeric_color,
+                                                            matrix_size=9, generate_random_pattern=False, generate_random_values=True,
+                                                            matrix_name="H", rhs_name="-g", unknown_name="d")
+                    new_framework.move_to(solver.get_center())
+                    self.scene.play(Transform(solver, new_framework), run_time=time_per_iteration)
