@@ -1,4 +1,5 @@
 from manim import *
+from slides.SCENE_CONFIG import *
 
 def create_dense_matrix(size: int) -> np.ndarray:
     # Create a dense matrix pattern for visualization
@@ -232,16 +233,16 @@ class LabeledBox(VGroup):
     
 
 class SymbolicNumericFramework(VGroup):
-    def __init__(self, A_sp: np.ndarray, label_font_size: int = 32,
+    def __init__(self, A_sp: np.ndarray, label_font_size: int = FONT_SIZE,
                  matrix_size: int = 10,
                  iteration: int = 0,
                  random_matrix_sparsity: float = 0.1,
                  generate_random_pattern: bool = False,
                  generate_random_values: bool = False,
-                 value_font_size: int = 24,
+                 value_font_size: int = FONT_SIZE,
                  symbolic_box_color: str = YELLOW_B,
                  numeric_box_color: str = GREEN_A,
-                 text_color: str = BLACK,
+                 text_color: str = TEXT_COLOR,
                  arrow_stroke_width: int = 1,
                  arrow_color: str = BLACK,
                  matrix_name: str = "A",
@@ -287,19 +288,20 @@ class SymbolicNumericFramework(VGroup):
         b = create_dense_column_vector(self.A_sp.shape[0], with_values=True, text_color=self.text_color, font_size=self.value_font_size)
         
 
-        A_label = Text(self.matrix_name, color=self.text_color, font_size=self.label_font_size)
-        b_label = Text(self.rhs_name, color=self.text_color, font_size=self.label_font_size)
-        and_label = Text(",", color=self.text_color, font_size=self.label_font_size)
-        and_label.next_to(A_sp_values, RIGHT, buff=0.2)
-        b.next_to(and_label, RIGHT, buff=0.2)
+        A_label = Text(self.matrix_name, color=self.text_color, font_size=self.label_font_size, font=FONT_TYPE)
+        # b_label = Text(self.rhs_name, color=self.text_color, font_size=self.label_font_size, font=FONT_TYPE)
+        # and_label = Text(",", color=self.text_color, font_size=self.label_font_size, font=FONT_TYPE)
+        # and_label.next_to(A_sp_values, RIGHT, buff=0.2)
+        # b.next_to(and_label, RIGHT, buff=0.2)
         A_label.next_to(A_sp_values, UP)
-        b_label.next_to(b, UP)
-        numeric_input_group = VGroup(A_sp_values, and_label, b, A_label, b_label).scale(0.8)
+        # b_label.next_to(b, UP)
+        # numeric_input_group = VGroup(A_sp_values, and_label, b, A_label, b_label).scale(0.8)
+        numeric_input_group = VGroup(A_sp_values, A_label).scale(0.8)
 
-        x = create_dense_column_vector(self.A_sp.shape[0], with_values=True, font_size=self.value_font_size)
-        x_label = MathTex(self.unknown_name, color=self.text_color, font_size=self.label_font_size)
-        x_label.next_to(x, UP)
-        solve_values = VGroup(x, x_label)
+        # x = create_dense_column_vector(self.A_sp.shape[0], with_values=True, font_size=self.value_font_size)
+        # x_label = MathTex(self.unknown_name, color=self.text_color, font_size=self.label_font_size)
+        # x_label.next_to(x, UP)
+        # solve_values = VGroup(x, x_label)
 
         A_sp_pattern = create_matrix_tex_pattern(self.A_sp.shape[0], self.A_sp.shape[1], self.A_sp, font_size=self.value_font_size)
         A_pattern_label = Text(self.matrix_name + "'s pattern", color=self.text_color, font_size=self.label_font_size)
@@ -316,14 +318,16 @@ class SymbolicNumericFramework(VGroup):
         sparse_cholesky_framework = VGroup(symbolic_box, sym_to_num_arrow, numeric_box)
         sparse_cholesky_label = BraceLabel(sparse_cholesky_framework, text=r"\text{Sparse Cholesky Solver}", buff=0.1, font_size=self.label_font_size).set_color(self.arrow_color)
         numeric_input_group.next_to(numeric_box, UP, buff=1.3)
-        solve_values.next_to(numeric_box, RIGHT, buff=1)
+        # solve_values.next_to(numeric_box, RIGHT, buff=1)
 
         arrow_pattern_to_symbolic = Arrow(A_sp_pattern.get_right(), sparse_cholesky_framework[0].get_left(), stroke_width=self.arrow_stroke_width, color=self.arrow_color)
         arrow_solve_input_to_numeric = Arrow(numeric_input_group.get_bottom(), sparse_cholesky_framework[2].get_top(), stroke_width=self.arrow_stroke_width, color=self.arrow_color)
-        arrow_sparse_cholesky_to_solve_values = Arrow(numeric_box.get_right(), solve_values.get_left(), stroke_width=self.arrow_stroke_width, color=self.arrow_color)
+        # arrow_sparse_cholesky_to_solve_values = Arrow(numeric_box.get_right(), solve_values.get_left(), stroke_width=self.arrow_stroke_width, color=self.arrow_color)
 
+        # solve_example = VGroup(A_pattern_group, arrow_pattern_to_symbolic, sparse_cholesky_framework,
+        #                     numeric_input_group, arrow_solve_input_to_numeric, arrow_sparse_cholesky_to_solve_values, solve_values, sparse_cholesky_label)
         solve_example = VGroup(A_pattern_group, arrow_pattern_to_symbolic, sparse_cholesky_framework,
-                            numeric_input_group, arrow_solve_input_to_numeric, arrow_sparse_cholesky_to_solve_values, solve_values, sparse_cholesky_label)
+                             numeric_input_group, arrow_solve_input_to_numeric, sparse_cholesky_label)
         return solve_example
     
 
@@ -489,7 +493,7 @@ class ParthStepsObject(VGroup):
         text_objects = []
         max_w = max_h = 0
         for txt in step_description:
-            t = Text(txt, font_size=24, color=BLACK)
+            t = Text(txt, font_size=FONT_SIZE, font=FONT_TYPE, color=BLACK)
             text_objects.append(t)
             max_w = max(max_w, t.width)
             max_h = max(max_h, t.height)
@@ -540,6 +544,7 @@ class ParthStepsObject(VGroup):
         hide_anim=FadeOut,
         lag_ratio: float = 0.05,
         resize_box: bool = True,
+        as_animation: bool = True,
     ) -> AnimationGroup:
         """
         Return an AnimationGroup that leaves only *step_numbers* visible.
@@ -584,12 +589,18 @@ class ParthStepsObject(VGroup):
         for idx in to_show:
             grp = self._get_step_mobjects(idx)
             grp.set_opacity(1)               # start hidden
-            anims.append(reveal_anim(grp))
+            if as_animation:
+                anims.append(reveal_anim(grp))
+            else:
+                grp.set_opacity(1)
 
         for idx in to_hide:
             grp = self._get_step_mobjects(idx)
             grp.set_opacity(0)
-            anims.append(hide_anim(grp))
+            if as_animation:
+                anims.append(hide_anim(grp))
+            else:
+                grp.set_opacity(0)
 
         # --------------------------- resize box --------------------------- #
         if resize_box:
@@ -599,13 +610,20 @@ class ParthStepsObject(VGroup):
                     fill_color=BLUE_A, stroke_color=BLUE_B,
                     stroke_width=1, corner_radius=0.1, buff=0.1,
                 )
-                anims.insert(0, Transform(self.parth_box, tgt))
+                if as_animation:
+                    anims.insert(0, Transform(self.parth_box, tgt))
+                else:
+                    self.parth_box.become(tgt)
             else:  # no steps → fade the box out
-                anims.insert(0, FadeOut(self.parth_box))
+                if as_animation:
+                    anims.insert(0, FadeOut(self.parth_box))
 
         # record new state
         self._visible = new_visible
-        return AnimationGroup(*anims, lag_ratio=lag_ratio)
+        if as_animation:
+            return AnimationGroup(*anims, lag_ratio=lag_ratio)
+        else:
+            return None
 
     # ────────────────────────────────────────────────────────────────────── #
     # Optional animated highlighter                                         #

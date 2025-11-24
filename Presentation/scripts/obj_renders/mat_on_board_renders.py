@@ -160,9 +160,9 @@ if __name__ == "__main__":
         ## initialize blender
         # imgRes_x = 1500 
         # imgRes_y = 1500
-        imgRes_x = 400 
-        imgRes_y = 400 
-        numSamples = 256 
+        imgRes_x = 1500 
+        imgRes_y = 1500
+        numSamples = 128 
         exposure = 1.5 
         bt.blenderInit(imgRes_x, imgRes_y, numSamples, exposure)
         ## read mesh (choose either readPLY or readOBJ)

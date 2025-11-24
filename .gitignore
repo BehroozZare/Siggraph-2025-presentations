@@ -1,9 +1,9 @@
 # Media folder (contains generated videos, images, etc.)
 media/
-
+*.png
 # Allow Figures folder to be tracked
 !Figures/
-
+V_*
 # Python
 __pycache__/
 *.py[cod]
@@ -140,3 +140,4 @@ Thumbs.db
 *.fls
 *.fdb_latexmk
 *.synctex.gz 
+*.blend

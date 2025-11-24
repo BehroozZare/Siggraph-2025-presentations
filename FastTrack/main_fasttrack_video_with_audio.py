@@ -16,8 +16,8 @@ class FastTrackComplete(VoiceoverScene):
 
     def construct(self):
         # set your TTS engine once
-        self.set_speech_service(GTTSService())
-        # self.set_speech_service(RecorderService())
+        # self.set_speech_service(GTTSService())
+        self.set_speech_service(RecorderService())
         # — Section 1 —
         self.section1.section1()
         # Clear the scene

@@ -6,9 +6,13 @@ from utils import *
 import numpy as np
 import os, re
 
+from slides.SCENE_CONFIG import *
+
 # 2) extend the pre-amble
 template = TexTemplate()
 template.add_to_preamble(r"\usepackage{xcolor}")
+template.add_to_preamble(r"\usepackage{helvet}")  # For Helvetica font
+template.add_to_preamble(r"\renewcommand{\familydefault}{\sfdefault}")  # Set sans-serif as default
 
 config.tex_template = template
 
@@ -82,8 +86,8 @@ class ProblemDefinition():
         matrix.next_to(frame, LEFT, buff=1)
         #Adding a surronding box around the matrix
         matrix_box = SurroundingRectangle(matrix, buff=0.0, color=BLACK, stroke_width=1)
-        hessian_label = BraceLabel(matrix_box, text="Hessians", label_constructor=Tex, buff=0.1, font_size=32).set_color(BLACK)
-        mat_on_board_label = BraceLabel(frame, text="IPC:MatOnBoard", label_constructor=Tex, buff=0.1, font_size=32).set_color(BLACK)
+        hessian_label = BraceLabel(matrix_box, text="Hessians", label_constructor=Tex, buff=0.1, font_size=FONT_SIZE).set_color(BLACK)
+        mat_on_board_label = BraceLabel(frame, text="IPC:MatOnBoard", label_constructor=Tex, buff=0.1, font_size=FONT_SIZE).set_color(BLACK)
         return Group(frame, matrix, matrix_box, hessian_label, mat_on_board_label).scale_to_fit_height(6)
 
     def _create_bar_chart(self, symbol: str = "\%")->CustomBarChart:
@@ -316,4 +320,150 @@ class ProblemDefinition():
                 metis_brace_label = BraceLabel(hessian_0_0_last_IPC_cholesky_metis_ordering, text="Metis Ordering (99.20\%)", label_constructor=Tex, buff=0.1, font_size=32).set_color(BLACK)
                 self.scene.play(FadeIn(matrices), run_time=self.transform_runtime)
                 self.scene.play(FadeIn(org_brace_label), FadeIn(natural_brace_label), FadeIn(metis_brace_label), run_time=self.transform_runtime)
+                self.scene.wait(self.wait_time)
+
+
+    def play_dynamic_sparsity_pattern_example(self, scene: Scene | VoiceoverScene):
+        self._prepare_simulations_frames()
+        #Scale each frame to fit the whole screen
+        for frame in self.sim_frames:
+            frame.scale_to_fit_width(self.scene.camera.frame_width * 0.95)
+
+        frame_and_matrix = self.sim_frames[0]
+        frame_and_matrix.center()
+        self.scene = scene
+        self.scene.add(frame_and_matrix)
+
+        script = "For example, here we have an application of physics-based simulation involving contact using the Incremental Potential Contact (IPC) simulator.\
+            For each frame, IPC performs multiple iterations of a second-order optimizer, using a sparse Cholesky solver to compute the search direction,\
+            and adds extra non-zero entries to enforce optimization constraints"
+        with self.scene.voiceover(text=script) as tracker:
+            total_time = 10
+            time_per_iteration = total_time / (len(self.frame_list) - 1)
+            for i in range(1, len(self.sim_frames)):
+            # for i in range(1, 4):
+                new_frame_and_matrix = self.sim_frames[i]
+                new_frame_and_matrix.center()
+                self.scene.remove(frame_and_matrix)
+                self.scene.add(new_frame_and_matrix)
+                self.scene.wait(0.1)
+                frame_and_matrix = new_frame_and_matrix
+
+
+    def play_symbolic_numeric_dynamic_sparsity_pattern_flow(self, scene: Scene | VoiceoverScene):
+        self.scene = scene
+        sparse_matrix = create_sparse_matrix(9, 0, 0.1)
+        sparse_cholesky_solver = SymbolicNumericFramework(A_sp=sparse_matrix, matrix_size=9,
+                                                        generate_random_pattern=True, generate_random_values=True,
+                                                        matrix_name="H", rhs_name="-g", unknown_name="d")
+        sparse_cholesky_solver.scale_to_fit_width(self.scene.camera.frame_width * 0.95)
+        sparse_cholesky_solver.center()
+        total_time = 10
+        time_per_iteration = total_time / 10
+        sad_emoji = ImageMobject("Figures/Problem/crying.png").scale(0.3)
+        sad_emoji.next_to(sparse_cholesky_solver[0][0], UP, buff=1)
+        script = "In these applications, both the symbolic and numerical phases will be executed multiple times, and due to rapid sparsity changes, the expensive symbolic analysis cannot be reused."
+        with self.scene.voiceover(text=script) as tracker:
+            for i in range(10):
+                numeric_color = RED_A if i % 2 == 0 else GREEN_A
+                symbolic_color = RED_A if i % 2 == 0 else YELLOW_B
+                new_framework = SymbolicNumericFramework(A_sp=sparse_matrix, iteration=i, numeric_box_color=numeric_color, symbolic_box_color=symbolic_color,
+                                                        matrix_size=9, generate_random_pattern=True, generate_random_values=True,
+                                                        matrix_name="H", rhs_name="-g", unknown_name="d")
+                new_framework.move_to(sparse_cholesky_solver.get_center())
+                if i == 5:
+                    self.scene.play(Transform(sparse_cholesky_solver, new_framework), FadeIn(sad_emoji), run_time=time_per_iteration)
+                else:
+                    self.scene.play(Transform(sparse_cholesky_solver, new_framework), run_time=time_per_iteration)
+        
+
+    def play_show_symbolic_analysis_chart(self, scene: Scene | VoiceoverScene):
+        chart = self._create_bar_chart()
+        text = Text("Symbolic Analysis Overhead", font_size=FONT_SIZE, color=BLACK)
+        text.next_to(chart, UP, buff=0.2)
+        group = VGroup(chart, text)
+        group.scale_to_fit_width(self.scene.camera.frame_width * 0.80)
+        group.center()
+        # group.center()
+        script = "Our IPC benchmark on challenging simulations shows that\
+             the symbolic analysis runtime, even for high-performance sparse Cholesky \
+                solvers such as Apple Accelerate, can account for up to 70% of the total\
+                     solver runtime, making it a major bottleneck for Cholesky solvers."
+        with self.scene.voiceover(text=script) as tracker:
+            self.scene.add(chart)
+            self.scene.play(chart.animate_to_values([76,70,49], run_time=1))
+            self.scene.play(Write(text), run_time=self.transform_runtime)
+            self.scene.wait(self.wait_time)
+
+
+    def play_internal_components(self, scene: Scene | VoiceoverScene):
+        self.scene = scene
+        script = "To further investigate this problem, we also evaluated the internals of \
+            symbolic analysis, where we can simplify as a fill-reducing ordering step, plus the rest of the symbolic analysis, such as supernodal computation or scheduling."
+        with self.scene.voiceover(text=script) as tracker:
+            symbolic_box = moduleBox(label_text="Symbolic Analysis", font_size=32, text_color=BLACK, stroke_color=BLACK,
+                                        block_total_width=4, block_total_height=2.0, fill_color=YELLOW_A, corner_radius=0.1)
+            symbolic_box.scale_to_fit_width(self.scene.camera.frame_width * 0.95)
+            symbolic_box.center()
+            self.scene.play(FadeIn(symbolic_box), run_time=self.transform_runtime)
+            self.scene.wait(self.wait_time)
+        
+            #Create a bar chart for the symbolic analysis components
+            ordering_box = moduleBox(label_text="Fill-reducing Ordering", font_size=32, text_color=BLACK, stroke_color=BLACK,
+                                        block_total_width=4.0, block_total_height=2.0, fill_color=YELLOW_A, corner_radius=0.1)
+            rest_of_analysis_box = moduleBox(label_text="Rest of Analysis", font_size=32, text_color=BLACK, stroke_color=BLACK,
+                                            block_total_width=3.0, block_total_height=2.0, fill_color=YELLOW_A, corner_radius=0.1)
+            rest_of_analysis_box.next_to(ordering_box, RIGHT, buff=1)
+            order_to_rest_arrow = Arrow(ordering_box.get_right(), rest_of_analysis_box.get_left(), buff=0.1, color=BLACK)
+            detailed_symbolic = VGroup(ordering_box, rest_of_analysis_box, order_to_rest_arrow)
+            detailed_symbolic.scale_to_fit_width(self.scene.camera.frame_width * 0.95)
+            detailed_symbolic.move_to(symbolic_box.get_center())
+            self.scene.play(ReplacementTransform(symbolic_box, detailed_symbolic), run_time=self.transform_runtime)
+        
+
+    def play_show_internal_overhead_chart(self, scene: Scene | VoiceoverScene):
+        chart = self._create_bar_chart()
+        text = Text("Fill-reducing Ordering overhead", font_size=FONT_SIZE, color=BLACK)
+        text.next_to(chart, UP, buff=0.2)
+        group = VGroup(chart, text)
+        group.scale_to_fit_width(self.scene.camera.frame_width * 0.80)
+        group.center()
+        # group.center()
+        self.scene.add(chart)
+        script = "Our internal benchmarking indicates that the fill-reducing\
+              ordering step is the primary bottleneck. For example, in the MatOnBoard \
+                simulation, this step accounts for up to 85% of the symbolic analysis runtime."
+        with self.scene.voiceover(text=script) as tracker:
+            self.scene.play(chart.animate_to_values([62,81,86], run_time=1))
+            self.scene.play(Write(text), run_time=self.transform_runtime)
+            self.scene.wait(self.wait_time)
+
+
+    def play_the_objective_of_ordering(self, scene: Scene | VoiceoverScene):
+            ordering_box = moduleBox(label_text="Fill-reducing Ordering", font_size=32, text_color=BLACK, stroke_color=BLACK,
+                            block_total_width=4.0, block_total_height=2.0, fill_color=YELLOW_A, corner_radius=0.1)
+            
+            initial_sparse_matrix = self._create_paper_initial_sparse_matrix()
+            initial_sparse_matrix_tex = create_manim_Matrix(row_num=initial_sparse_matrix.shape[0],
+                                                            col_num=initial_sparse_matrix.shape[1],
+                                                            matrix=initial_sparse_matrix)
+            initial_sparse_matrix_tex.get_brackets().set_color(BLACK)
+            initial_sparse_matrix_tex.next_to(ordering_box, LEFT, buff=1)
+            output_vector = np.array([7, 5, 6, 3, 8, 2, 1, 4, 0]).reshape(-1, 1)
+            output_vector_tex = Matrix(output_vector)
+            output_vector_tex.next_to(ordering_box, RIGHT, buff=1)
+            output_vector_tex.get_brackets().set_color(BLACK)
+            output_vector_tex.get_entries().set_color(BLACK)
+            scene_group = VGroup(ordering_box, initial_sparse_matrix_tex, output_vector_tex)
+            scene_group.scale_to_fit_width(self.scene.camera.frame_width * 0.95)
+            scene_group.center()
+
+            #Arrows
+            script = "The objective of this module is to provide a permutation vector that reorders the input matrix to reduce fill-ins during factorization.\
+                Specifically, the module takes the sparsity pattern of the linear system as input and returns a permutation vector such that the reordered matrix has fewer fill-ins during factorization."
+            with self.scene.voiceover(text=script) as tracker:
+                input_to_order = Arrow(initial_sparse_matrix_tex.get_right(), ordering_box.get_left(), buff=0.1, color=BLACK)
+                order_to_output = Arrow(ordering_box.get_right(), output_vector_tex.get_left(), buff=0.1, color=BLACK)
+
+                self.scene.play(FadeIn(initial_sparse_matrix_tex, input_to_order, ordering_box, order_to_output, output_vector_tex), run_time=self.transform_runtime * 2)
                 self.scene.wait(self.wait_time)

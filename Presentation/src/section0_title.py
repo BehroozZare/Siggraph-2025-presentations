@@ -2,11 +2,13 @@ from manim import *
 from manim_voiceover import VoiceoverScene
 from manim_voiceover.services.recorder import RecorderService
 from manim_voiceover.services.gtts import GTTSService
-
+from slides.SCENE_CONFIG import *
 
 # 2) extend the pre-amble
 template = TexTemplate()
 template.add_to_preamble(r"\usepackage{xcolor}")
+template.add_to_preamble(r"\usepackage{helvet}")  # For Helvetica font
+template.add_to_preamble(r"\renewcommand{\familydefault}{\sfdefault}")  # Set sans-serif as default
 
 config.tex_template = template
 
